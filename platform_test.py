@@ -7,3 +7,5 @@ survey = sp.Survey('TESTSURVEY', 'SPECIALSURVEY',
 
 for org in survey.combined.get_orgs():
     survey.combined.get_summary(org, 'locality1')
+
+test='test'
