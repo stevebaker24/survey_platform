@@ -137,6 +137,8 @@ class Question:
             if not np.isnan(x):
                 mydict[i] = int(x)
         return mydict
+        # can use dict comprehension with conditional but might be too long. Can also use generator. 
+        # {i: int(x) for for i, x in enumerate(q_row[(score_indicies[0]):(score_indicies[-1])])
 
     @staticmethod
     def get_score_responses(q_row, score_indicies):
