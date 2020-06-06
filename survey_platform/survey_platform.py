@@ -2,7 +2,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-pd.options.mode.chained_assignment = None
+output_path = Path('C:/Users/steve.baker/PycharmProjects/survey_app/survey_app/static/outputs')
 
 scoring_terms = {'pos': {'value': 1, 'string': 'Positive', 'suffix': '_pos'},
                  'neu': {'value': 2, 'string': 'Neutral', 'suffix': '_neu'},
@@ -14,7 +14,7 @@ scored_terms = [i['value'] for i in scoring_terms.values()]
 scored_terms.remove(ignore_value)
 
 
-def input_filetype(path, index_col):
+def _input_filetype(path, index_col):
     extension = path.split('.')[-1]
     if extension == "csv":
         return pd.read_csv(path, index_col=index_col)
@@ -22,28 +22,85 @@ def input_filetype(path, index_col):
         return pd.read_parquet(path, engine='pyarrow')
 
 
+def calc_scores(df, questions, score_types=['pos']):
+    for question in questions.get_scored_questions():
+        question_score_response_dict = (questions.questionlist[question]).score_responses
+
+        for score in score_types:
+            score_column_header = question + scoring_terms[score]['suffix']
+            score_responses = question_score_response_dict[score]
+
+            df.loc[df[question].isin(scored_terms), score_column_header] = 0
+            df.loc[df[question].isin(score_responses), score_column_header] = 100
+
+    return df
+
+
+def get_summary_csv(df, org, group_variable, questions, score_type=['pos']):
+    columns_for_scoring = [group_variable]
+    columns_output = [group_variable]
+
+    for question in questions.get_scored_questions():
+        columns_for_scoring.append(question)
+        for score in score_type:
+            columns_output.append(question + scoring_terms[score]['suffix'])
+
+    df = (df[df['trust_id'] == org])[columns_for_scoring]
+
+    df = calc_scores(df, questions, score_type)
+
+    # group by group_variable
+    grouped = df[columns_output].groupby(group_variable).mean()
+
+    # comparator
+    comparator = df[columns_output].mean().rename('Organisation')
+
+    # append and output to csv
+    grouped.append(comparator).to_csv(output_path / f'{org}_output.csv')
+
+    return output_path / f'{org}_output.csv'
+
+
 class Survey:
 
-    def __init__(self, name, survey_type, questions, responses, sample):
+    def __init__(self, name, survey_type, questions_path, responses_path, sample_path):
         self.name = name
         self.survey_type = survey_type
-        self.questions = Questions(questions)
-        self.sample = Sample(sample)
-        self.responses = Responses(responses)
+        self.questions = Questions(questions_path)
+        self.sample = Sample(sample_path)
+        self.responses = Responses(responses_path)
         self.combined = Combined(self.sample, self.responses, self.questions)
+        #self.reporting = Reporting(combined)
+
+
+class Sample:
+
+    def __init__(self, sample_path):
+        self.df = _input_filetype(sample_path, 'sample_id')
+
+    def get_orgs(self):
+        return self.df['trust_id'].unique().tolist()
+
+
+class Responses:
+
+    def __init__(self, responses_path):
+        self.df = _input_filetype(responses_path, 'respondent_id')
+
+
+class Combined:
+
+    def __init__(self, sample, responses, questions):
+        self.df = sample.df.join(responses.df, how='left')
+        self.questions = questions
 
 
 class Questions:
 
     def __init__(self, question_path):
         self.df = pd.read_csv(question_path, index_col='qid')
-
-        self.score_indices = [i for i, elem in enumerate(list(self.df.columns)) if 's_' in elem[0:2]]
-        self.response_indices = [i for i, elem in enumerate(list(self.df.columns)) if 'r_' in elem[0:2]]
-
-        self.questionlist = {}
-        for row in self.df.iterrows():
-            self.questionlist[row[0]] = Question(row, self.score_indices, self.response_indices)
+        self.questionlist = self._generate_dict()
+        self.scored_questions = [k for k, v in self.questionlist.items() if v.pos_scored == 1]
 
     def __iter__(self):
         return iter(self.questionlist.values())
@@ -52,7 +109,13 @@ class Questions:
         return len(self.questionlist)
 
     def get_scored_questions(self):
-        return (self.df[self.df['pos_scored'] == 1]).index.tolist()
+        return self.scored_questions
+
+    def _generate_dict(self):
+        score_indices = [i for i, elem in enumerate(list(self.df.columns)) if 's_' in elem[0:2]]
+        response_indices = [i for i, elem in enumerate(list(self.df.columns)) if 'r_' in elem[0:2]]
+
+        return {row[0]: Question(row, score_indices, response_indices) for row in self.df.iterrows()}
 
 
 class Question:
@@ -63,12 +126,12 @@ class Question:
         self.q_type = q_row[1]['q_type']
         self.pos_scored = q_row[1]['pos_scored']
 
-        self.score_map = self.__get_score_map(q_row[1], score_indices)
-        self.responses = self.__get_response_map(q_row[1], response_indices)
-        self.score_responses = self.__get_score_responses(q_row[1], score_indices)
+        self.score_map = self.get_score_map(q_row[1], score_indices)
+        self.responses = self.get_response_map(q_row[1], response_indices)
+        self.score_responses = self.get_score_responses(q_row[1], score_indices)
 
     @staticmethod
-    def __get_score_map(q_row, score_indicies):
+    def get_score_map(q_row, score_indicies):
         mydict = {}
         for i, x in enumerate(q_row[(score_indicies[0]):(score_indicies[-1])]):
             if not np.isnan(x):
@@ -76,7 +139,7 @@ class Question:
         return mydict
 
     @staticmethod
-    def __get_score_responses(q_row, score_indicies):
+    def get_score_responses(q_row, score_indicies):
 
         mydict = {'pos': [],
                   'neu': [],
@@ -97,7 +160,7 @@ class Question:
         return mydict
 
     @staticmethod
-    def __get_response_map(q_row, response_indices):
+    def get_response_map(q_row, response_indices):
         mydict = {}
         for i, x in enumerate(q_row[(response_indices[0]):(response_indices[-1])]):
             if isinstance(x, str):
@@ -105,73 +168,7 @@ class Question:
         return mydict
 
 
-class Sample:
+class Reporting:
 
-    def __init__(self, sample_path):
-        self.index_col = 'sample_id'
-        self.df = input_filetype(sample_path, self.index_col)
-        # pd.read_csv(sample_path, index_col='sample_id')
-
-    def get_num_samples(self):
-        return len(self.df)
-
-
-class Responses:
-
-    def __init__(self, responses_path):
-        self.index_col = 'respondent_id'
-        self.df = input_filetype(responses_path, self.index_col)
-
-        # self.df = pd.read_csv(responses_path, index_col='respondent_id')
-
-    def get_num_responses(self):
-        return len(self.df)
-
-
-class Combined:
-
-    def __init__(self, sample, responses, questions):
-        self.df = sample.df.join(responses.df, how='left')
-        self.questions = questions
-
-    def calc_scores(self, summarydf, score_types):
-        for question in self.questions.get_scored_questions():
-            question_score_response_dict = (self.questions.questionlist[question]).score_responses
-
-            for score in score_types:
-                score_column_header = question + scoring_terms[score]['suffix']
-                score_responses = question_score_response_dict[score]
-
-                summarydf.loc[summarydf[question].isin(scored_terms), score_column_header] = 0
-                summarydf.loc[summarydf[question].isin(score_responses), score_column_header] = 100
-
-        return summarydf
-
-    def get_orgs(self):
-        return self.df['trust_id'].unique().tolist()
-
-    def get_summary(self, trust, group_variable, score_type=['pos']):
-
-        columns_summary = [group_variable]
-        columns = [group_variable]
-
-        for question in self.questions.get_scored_questions():
-            columns_summary.append(question)
-            for score in score_type:
-                columns.append(question + scoring_terms[score]['suffix'])
-
-        summarydf = self.df[self.df['trust_id'] == trust]
-        summarydf = self.calc_scores(summarydf[columns_summary], score_type)
-
-        output_path = Path('C:/Users/steve.baker/PycharmProjects/python-scripts/myproject/app/static/outputs')
-
-        # comparator
-        comparator = summarydf[columns].mean().rename('Organisation')
-
-        # groupby
-        grouped = summarydf[columns].groupby(group_variable).mean()
-
-        # output to csv
-        grouped.append(comparator).to_csv(output_path / f'{trust}_output.csv')
-
-        return output_path / (trust + '_output.csv')
+    def __init__(self, df, questions):
+        self.df = calc_scores(df, questions, score_types=['pos', 'neu', 'neg'])
