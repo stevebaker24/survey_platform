@@ -1,6 +1,8 @@
 from pathlib import Path
 import numpy as np
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 output_path = Path('C:/Users/steve.baker/PycharmProjects/survey_app/survey_app/static/outputs')
 
@@ -36,29 +38,63 @@ def calc_scores(df, questions, score_types=['pos']):
     return df
 
 
-def get_summary_csv(df, org, group_variable, questions, score_type=['pos']):
-    columns_for_scoring = [group_variable]
-    columns_output = [group_variable]
+def get_rag(source, seperate_by_field='trust_id', seperator=None, group_by=None, questions=None,
+                    score_type='pos'):
+
+    if isinstance(group_by, str):
+        columns_for_scoring, columns_output = [group_by], [group_by]
+        number_groups = 1
+    elif isinstance(group_by, list):
+        columns_for_scoring, columns_output = group_by.copy(), group_by.copy()
+        number_groups = len(group_by)
 
     for question in questions.get_scored_questions():
         columns_for_scoring.append(question)
-        for score in score_type:
-            columns_output.append(question + scoring_terms[score]['suffix'])
+        columns_output.append(question + scoring_terms[score_type]['suffix'])
 
-    df = (df[df['trust_id'] == org])[columns_for_scoring]
-
-    df = calc_scores(df, questions, score_type)
+    if isinstance(source, Reporting):
+        df = (source.df[source.df[seperate_by_field] == seperator])[columns_output]
+    elif isinstance(source, Survey):
+        df = (source.reporting.df[source.reporting.df[seperate_by_field] == seperator])[columns_output]
+    else:
+        df = (source[source[seperate_by_field] == seperator])[columns_for_scoring]
+        df = calc_scores(df, questions, [score_type])[columns_output]
 
     # group by group_variable
-    grouped = df[columns_output].groupby(group_variable).mean()
+    grouped = df.groupby(group_by).mean()
 
     # comparator
-    comparator = df[columns_output].mean().rename('Organisation')
+    comparator = df[columns_output].mean().to_frame().transpose()
+
+    if number_groups > 1:
+        multiindex = tuple(['  ' for i in range(number_groups-1)] + ['Organisation'])
+        index = pd.MultiIndex.from_tuples([multiindex])
+    elif number_groups == 1:
+        index = pd.Index(['Organisation'])
+
+    comparator = comparator.set_index(index)
+
+    #combined
+    combined = comparator.append(grouped)
 
     # append and output to csv
-    grouped.append(comparator).to_csv(output_path / f'{org}_output.csv')
+    combined.transpose().to_excel(output_path / f'{seperator}_output.xlsx')
 
-    return output_path / f'{org}_output.csv'
+    return output_path / f'{seperator}_output.xlsx'
+
+
+def get_heatmap(reporting, questions):
+    df = reporting.df[questions].replace({1: -2, 2: -1, 3: 0, 4: 1, 5: 2, 6: np.nan})
+
+    corr_matrix = df.corr(method='spearman')
+
+    # Bunch of stuff to prepare the mask to hde half of the results
+    mask = np.zeros_like(corr_matrix)
+    mask[np.tril_indices_from(mask)] = True
+    np.logical_not(mask, out=mask)
+
+    sns.heatmap(corr_matrix, cmap='RdBu', vmin=-1, vmax=1, annot=True, mask=mask)
+    plt.show()
 
 
 class Survey:
@@ -70,7 +106,7 @@ class Survey:
         self.sample = Sample(sample_path)
         self.responses = Responses(responses_path)
         self.combined = Combined(self.sample, self.responses, self.questions)
-        #self.reporting = Reporting(combined)
+        self.reporting = Reporting(self.combined, self.questions)
 
 
 class Sample:
@@ -170,5 +206,5 @@ class Question:
 
 class Reporting:
 
-    def __init__(self, df, questions):
-        self.df = calc_scores(df, questions, score_types=['pos', 'neu', 'neg'])
+    def __init__(self, combined, questions):
+        self.df = calc_scores(combined.df, questions, score_types=['pos', 'neu', 'neg'])
