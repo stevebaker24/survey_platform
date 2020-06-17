@@ -110,18 +110,28 @@ def get_rag(source,
 def get_freq_tables(trust, combined, questions):
     df = combined[combined['trust_id'] == trust]
 
-    for question in questions.single_response_questions:
-        print(df[question.qid].value_counts().sort_index())
+    writer = pd.ExcelWriter(output_path / f'{trust}_FREQ.xlsx', engine='xlsxwriter')
 
-    #currently does not include vlaues which have no responses...
+    for question in questions.single_response_questions:
+
+        df[question.qid].value_counts(normalize=True).sort_index().to_excel(writer, sheet_name=question.qid)
+
+    writer.save()
+
+    return output_path / f'{trust}_FREQ.xlsx'
+    #currently does not include values which have no responses...
 
 def get_freetext(trust, combined, questions):
     df = combined[combined['trust_id'] == trust]
 
-    for question in questions.text_response_questions:
-        print(df[question.qid].dropna().reset_index(drop=True))
+    writer = pd.ExcelWriter(output_path / f'{trust}_TEXT.xlsx', engine='xlsxwriter')
 
-    # currently does not include vlaues which have no responses...
+    for question in questions.text_response_questions:
+        df[question.qid].dropna().reset_index(drop=True).to_excel(writer, sheet_name=question.qid)
+
+    writer.save()
+
+    return output_path / f'{trust}_TEXT.xlsx'
 
 def get_heatmap(reporting, questions):
     df = reporting.df[questions].replace({1: -2, 2: -1, 3: 0, 4: 1, 5: 2, 6: np.nan})
@@ -146,7 +156,7 @@ class Survey:
         self.sample = Sample(sample_path)
         self.responses = Responses(responses_path)
         self.combined = Combined(self.sample, self.responses, self.questions)
-        #self.reporting = Reporting(self.combined, self.questions)
+        self.reporting = Reporting(self.combined, self.questions)
 
 
 class Sample:
