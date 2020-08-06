@@ -1,0 +1,23 @@
+from survey_platform import survey_platform as sp
+from survey_platform import etabs as etabs
+
+
+questions = sp.Questions(r"C:\Users\steve.baker\Desktop\MAT Nonsense\NMEC20 POS SCORE MAPPING V1.1 RAG format SB.xlsx")
+responses = sp.Responses(r"C:\Users\steve.baker\Desktop\MAT Nonsense\New mothers experience of care survey 2020_3 August 2020_11.51.csv", 'ResponseId')
+sample = sp.Sample(r"C:\Users\steve.baker\Desktop\MAT Nonsense\sample\sample.xlsx", 'Record number')
+
+combined = sp.Combined(sample, responses)
+
+# for question in questions:
+#     print(question.score_responses)
+#     print(question.score_map)
+
+#sp.get_frequency_table(source=combined.df, questions=questions, file_breakdown_field='Trust code')
+
+#sp.get_freetext(source=combined.df, questions=questions)
+
+#etabs.positivescoretable_current(combined.df, questions, comparator='Trust code')
+
+#etabs.ez(combined.df, questions, 'Trust code')
+
+etabs.response(combined.df, 'Trust code')
