@@ -12,12 +12,12 @@ combined = sp.Combined(sample, responses)
 #     print(question.score_responses)
 #     print(question.score_map)
 
-#sp.get_frequency_table(source=combined.df, questions=questions, file_breakdown_field='Trust code')
+sp.get_frequency_table(source=combined.df, questions=questions, file_breakdown_field='Trust code', sheet_breakdown_fields=['CCG code'], suppression_threshold=30)
 
-#sp.get_freetext(source=combined.df, questions=questions)
+#sp.get_freetext(source=combined.df, questions=questions, file_breakdown_field='Trust code', sheet_breakdown_fields=['CCG code', 'Title'])
 
-#etabs.positivescoretable_current(combined.df, questions, comparator='Trust code')
-
-#etabs.ez(combined.df, questions, 'Trust code')
-
-etabs.response(combined.df, 'Trust code')
+# etabs.positivescoretable_current(combined.df, questions, comparator='Trust code', suppression_threshold=30)
+#
+# etabs.ez(combined.df, questions, 'Trust code')
+#
+# etabs.response(combined.df, 'Trust code', outcome_field='outcome')
