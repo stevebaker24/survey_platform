@@ -1,23 +1,25 @@
 from survey_platform import survey_platform as sp
 from survey_platform import etabs as etabs
-
+import pandas as pd
 
 questions = sp.Questions(r"C:\Users\steve.baker\Desktop\MAT Nonsense\NMEC20 POS SCORE MAPPING V1.1 RAG format SB.xlsx")
-responses = sp.Responses(r"C:\Users\steve.baker\Desktop\MAT Nonsense\New mothers experience of care survey 2020_3 August 2020_11.51.csv", 'ResponseId')
-sample = sp.Sample(r"C:\Users\steve.baker\Desktop\MAT Nonsense\sample\sample.xlsx", 'Record number')
 
+
+responses = sp.Responses(r"C:\Users\steve.baker\Desktop\MAT Nonsense\matcleanoutput.csv", indexcol='ResponseId')
+sample = sp.Sample(r"C:\Users\steve.baker\Desktop\MAT Nonsense\sample\sample.xlsx", indexcol='Record number')
 combined = sp.Combined(sample, responses)
 
-# for question in questions:
-#     print(question.score_responses)
-#     print(question.score_map)
+responses_histroic = sp.Responses(r"C:\Users\steve.baker\Desktop\MAT Nonsense\mat19.csv", indexcol='Recordnumber')
 
-sp.get_frequency_table(source=combined.df, questions=questions, file_breakdown_field='Trust code', sheet_breakdown_fields=['CCG code'], suppression_threshold=30)
-
+#sp.get_frequency_table(source=combined.df, questions=questions, file_breakdown_field='Trust code', sheet_breakdown_fields=['CCG code'], suppression_threshold=30)
 #sp.get_freetext(source=combined.df, questions=questions, file_breakdown_field='Trust code', sheet_breakdown_fields=['CCG code', 'Title'])
 
-# etabs.positivescoretable_current(combined.df, questions, comparator='Trust code', suppression_threshold=30)
-#
-# etabs.ez(combined.df, questions, 'Trust code')
-#
-# etabs.response(combined.df, 'Trust code', outcome_field='outcome')
+#etabs.positivescoretable(combined.df, questions, breakdown_field='Trust code', suppression_threshold=30, filename='PositiveScoreTable_CURRENT', level_prefix='L0')
+#etabs.positivescoretable(responses_histroic.df, questions, breakdown_field='Trustcode', suppression_threshold=30, filename='PositiveScoreTable_Y-1', period='P-1', level_prefix='L0')
+#etabs.positivescoretable(combined.df, questions, breakdown_field='Place of birth: NHS site code', suppression_threshold=30, filename='SiteScores_CURRENT', level_prefix='L1')
+#etabs.minmeanmax(combined.df, questions, breakdown_field='Trust code', suppression_threshold=30)
+etabs.ez(combined.df, responses_histroic.df, questions, source_breakdown_field='Trust code', other_source_breakdown_field='Trustcode', level_prefix='L0', suppression_threshold=30)
+#etabs.response(combined.df, comparator='Trust code', outcome_field='outcomefieldtest', filename='RespRates_CURRENT', level_prefix='L0')
+#etabs.response(responses_histroic.df, comparator='Trustcode', outcome_field='Outcome', filename='RespRates_HISTORIC', level_prefix='L0')
+#etabs.site_n(combined.df, questions, breakdown_field='Place of birth: NHS site code', l0_field='Trust code')
+#etabs.survey_information(combined.df, breakdown_field='Trust code', outcome_field='outcomefieldtest')

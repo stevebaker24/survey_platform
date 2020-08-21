@@ -12,6 +12,14 @@ import xlsxwriter
 suppression_threshold = 30
 suppression_framework = 'patient'
 
+survey_periods = {
+    'P': '2020',
+    'P-1': '2019',
+    'P-2': '2018',
+    'P-3': '2017',
+    'P-4': '2016'
+}
+
 #setup
 output_path = Path(config.output_path)
 
@@ -27,7 +35,7 @@ def _input_filetype(path, index_col):
     if extension == "csv":
         return pd.read_csv(path, index_col=index_col)
     if extension == "tsv":
-        return pd.read_csv(path, sep='\t', index_col=index_col)
+        return pd.read_csv(path, sep='\t', index_col=index_col, encoding='utf-16')
     elif extension == "parquet":
         return pd.read_parquet(path, engine='pyarrow')
     if extension == "xlsx":
@@ -50,25 +58,38 @@ def z_test(pos_n_two, scorable_n_two, pos_n_one, scorable_n_one):
 
 ### multi respinse options questions.
 
-def calc_scores(df, questions, score_types=['pos']):
+def calc_scores(df, questions, score_types=['pos'], period='P'):
     for question in questions.scored_questions:
-        question_score_response_dict = question.score_responses
-        scored_responses = question.scored_responses
-        qid = question.qid
+
+        question_score_response_dict = question.get_score_responses(period=period)
+        scored_responses = question.get_scored_responses(period=period)
+        scored_columns = question.get_scored_columns(period=period)
+
+
+        current_qid = question.get_qid('P')
+        #qid = question.get_qid(period)
 
 
         for score in score_types:
-            score_column_header = qid + scoring_terms_dict[score]['suffix']
+            score_column_header = current_qid + scoring_terms_dict[score]['suffix']
+
+            #drop if alreay in the output column set.
+            if score_column_header in df.columns:
+                print(score_column_header)
+                df = df.drop(score_column_header, axis=1)
 
             if question.q_type == 'M':
-                df.loc[df[question.scored_columns].sum(axis=1) > 0, score_column_header] = 0
-                df.loc[df[question.score_columns_dict[score]].sum(axis=1) > 0, score_column_header] = 100
+                score_columns = question.get_score_columns(period)[score]
+
+                df.loc[df[scored_columns].sum(axis=1) > 0, score_column_header] = 0
+                df.loc[df[score_columns].sum(axis=1) > 0, score_column_header] = 100
 
             if question.q_type == 'S':
                 score_responses = question_score_response_dict[score]
+                scored_column = scored_columns[0]
 
-                df.loc[df[question.qid].isin(scored_responses), score_column_header] = 0
-                df.loc[df[question.qid].isin(score_responses), score_column_header] = 100
+                df.loc[df[scored_column].isin(scored_responses), score_column_header] = 0
+                df.loc[df[scored_column].isin(score_responses), score_column_header] = 100
 
     return df
 
@@ -92,11 +113,11 @@ def get_rag(source,
 
     #iteratre trough questions to select columns and theme mapping
     topic_dict = {}
-    for question in questions.get_scored_questions():
-        topic_dict[question.qid + scoring_terms_dict[score_type]['suffix']] = questions.questions_dict[question.qid].theme
+    for question in questions.scored_questions:
+        topic_dict[question.get_qid() + scoring_terms_dict[score_type]['suffix']] = questions.questions_dict[question.get_qid()].category
 
-        columns_for_scoring.append(question.qid)
-        columns_output.append(question.qid + scoring_terms_dict[score_type]['suffix'])
+        columns_for_scoring.append(question.get_qid())
+        columns_output.append(question.get_qid() + scoring_terms_dict[score_type]['suffix'])
 
     # check type of input, either reporting, survey or just a df
     if isinstance(source, Reporting):
@@ -108,40 +129,28 @@ def get_rag(source,
         df = calc_scores(df, questions, [score_type])[columns_output]
 
 
-    #unpivot data
-    melteddf = df.melt(id_vars=group_by)
-
-    #map on the question topics
-    melteddf['topic'] = melteddf['variable'].map(topic_dict)
-
-    #main frame
-    df_main = melteddf.pivot_table(index=['topic', 'variable'],
-                                     columns=group_by ,
-                                     values='value',
-                                     aggfunc=['count', np.sum],
-                                     margins=True)
-
-    #by theme subtotals
-    df_theme = df_main.groupby('topic').sum().drop('All') # no need for all on both when combining
-    df_theme['newcolumn'] = df_theme.index #for alphabetical sorting
-    df_theme = df_theme.set_index('newcolumn', append=True)
-    #append
-    hello = df_main.append(df_theme).sort_index()
-
-    #calculate mean
-    hi = hello['sum']/hello['count']
+    df_mean = df.groupby(group_by).mean().transpose()
+    df_count = df.groupby(group_by).count().transpose()
 
     # suppression
-    suppression_mask = hello['count'] < suppression_threshold
-    hi = hi.mask(suppression_mask)
+    suppression_mask = df_count < 11
+    df_mean_suppressed = df_mean.mask(suppression_mask)
+
+    overall_df_mean = df_mean_suppressed.mean(axis=1).rename('Overall')
+    overall_df_count = df_count.sum(axis=1).rename('Overall')
+
+    combined_df_mean_suppressed = df_mean_suppressed.join(overall_df_mean)
+    combined_df_count = df_count.join(overall_df_count)
+
+
 
     # write to excel
-    writer = pd.ExcelWriter(output_path/f'{seperator}_RAG.xlsx', engine='xlsxwriter')
-    hi.replace(np.nan, '*').to_excel(writer, sheet_name='Sheet1')
+    writer = pd.ExcelWriter(output_path/f'{seperator}_RAG_{group_by}.xlsx', engine='xlsxwriter')
+    (combined_df_mean_suppressed/100).replace(np.nan, '*').to_excel(writer, sheet_name='Sheet1')
     worksheet = writer.sheets['Sheet1']
     writer.save()
 
-    return output_path / f'{seperator}_RAG.xlsx'
+    return output_path / f'{seperator}_RAG_{group_by}.xlsx'
 
 
 def get_frequency_table(source, questions, suppression_threshold, sheet_breakdown_fields=[], file_breakdown_field=None, file_breakdown_values=[]):
@@ -408,6 +417,7 @@ def get_frequency_table(source, questions, suppression_threshold, sheet_breakdow
                                 if option_number in score_responses['ignore']:
                                     continue
 
+
                             worksheet.write(row, 1, response_option, option_format)
 
                         if breakdown_value_total_responses < suppression_threshold:
@@ -452,7 +462,7 @@ def get_frequency_table(source, questions, suppression_threshold, sheet_breakdow
         workbook.close()
 
 
-def get_freetext(source, questions, sheet_breakdown_fields=['Total'], file_breakdown_field=None, file_breakdown_values=[], suppression_threshold=suppression_threshold, suppression_framework=suppression_framework):
+def get_freetext(source, questions, sheet_breakdown_fields=['Total'], file_breakdown_field=None, file_breakdown_values=[], suppression_threshold=None, suppression_framework=None):
     if len(file_breakdown_values) == 0 and file_breakdown_field != None:
         file_breakdown_values = source[file_breakdown_field].unique().tolist()
 
@@ -472,11 +482,13 @@ def get_freetext(source, questions, sheet_breakdown_fields=['Total'], file_break
 
             no_breakdown = True if sheet_breakdown_field == 'Total' else False
 
-            if no_breakdown:
-                supp = true if len(breakdown_file_df) < suppression_threshold else False
-            else:
-                group = breakdown_file_df[[sheet_breakdown_field, 'Trust code']].groupby(sheet_breakdown_field).count()
-                suppress_list = group.index[group['Trust code'] < suppression_threshold].tolist()
+            suppress_list=[]
+            if suppression_framework == 'pateint':
+                if no_breakdown:
+                    supp = true if len(breakdown_file_df) < suppression_threshold else False
+                else:
+                    group = breakdown_file_df[[sheet_breakdown_field, file_breakdown_field]].groupby(sheet_breakdown_field).count()
+                    suppress_list = group.index[group[file_breakdown_field] < suppression_threshold].tolist()
 
 
             worksheet = workbook.add_worksheet(sheet_breakdown_field)
@@ -489,6 +501,8 @@ def get_freetext(source, questions, sheet_breakdown_fields=['Total'], file_break
                 qid = question.qid
                 q_text = question.q_text
                 header = f'{question.qid} - {q_text}'
+
+
 
                 if no_breakdown:
                     columns = []
@@ -505,23 +519,37 @@ def get_freetext(source, questions, sheet_breakdown_fields=['Total'], file_break
 
                 row = 1
 
-                question_df = breakdown_file_df[columns].dropna()
+                question_df = breakdown_file_df[columns].sort_values(by=[sheet_breakdown_field])\
+                                                        .dropna()
+
+                if suppression_framework == 'staff':
+                    if no_breakdown:
+                        supp = true if len(question_df) < suppression_threshold else False
+
+                    else:
+                        group = question_df.groupby(sheet_breakdown_field).count()
+                        suppress_list = group.index[group[qid] < suppression_threshold].tolist()
+
                 number_of_responses = len(question_df)
 
                 for response in question_df.iterrows():
+
+                    group = response[1][0]
+                    response_text = response[1][1]
+
                     if no_breakdown:
                         if supp:
-                            worksheet.write(row, column, '*')
+                            worksheet.write(row, column, '{COMMENT SUPPRESSED}')
                         else:
-                            worksheet.write(row, column, response[1][0])
+                            worksheet.write(row, column, group)
 
                     else:
-                        if response[1][0] in suppress_list:
-                            worksheet.write(row, column, response[1][0])
-                            worksheet.write(row, column+1, '*')
+                        if group in suppress_list:
+                            worksheet.write(row, column, group)
+                            worksheet.write(row, column+1, '{COMMENT SUPPRESSED}')
                         else:
-                            worksheet.write(row, column, response[1][0])
-                            worksheet.write(row, column+1, response[1][1])
+                            worksheet.write(row, column, group)
+                            worksheet.write(row, column+1, response_text)
                     row += 1
 
                 if no_breakdown:
@@ -570,9 +598,38 @@ class Sample:
 
 class Responses:
 
-    def __init__(self, responses_path, indexcol):
+    def __init__(self, responses_path, indexcol, period=None, questions=None, breakdown_field=None, breakdown_field_values=None, master_breakdown_field=None):
         self.df = _input_filetype(responses_path, indexcol)
-
+        # if period is None:
+        #     self.df = _input_filetype(responses_path, indexcol)
+        #
+        # else:
+        #     df = _input_filetype(responses_path, indexcol)
+        #
+        #     # rename historic questions
+        #     p_questions = questions.get_questions('P')
+        #     period_questions = questions.get_questions(period)
+        #
+        #     p_question_columns = [question.get_question_columns('P') for question in p_questions]
+        #     p_question_columns = [item for sublist in p_question_columns for item in sublist]
+        #
+        #     period_question_columns = [question.get_question_columns(period) for question in period_questions]
+        #     period_question_columns = [item for sublist in period_question_columns for item in sublist]
+        #
+        #     # identify columns which could be ambiguous and drop from df
+        #     for column in df.columns:
+        #         if (column in p_question_columns) and (column not in period_question_columns):
+        #             df = df.drop(column, axis=1)
+        #
+        #     #reaplce column header:
+        #     for question in period_questions:
+        #         if question.get_qid(period) != question.get_qid('P'):
+        #
+        #             for i, column in enumerate(question.get_question_columns(period)):
+        #                 replacement_column = question.get_question_columns("P")[i]
+        #                 df.columns = df.columns.str.replace(f'^{column}$', f'{replacement_column}')
+        #
+        #     self.df = df
 
 class Combined:
 
@@ -583,54 +640,85 @@ class Combined:
 class Questions:
 
     def __init__(self, question_path):
-        self.df = pd.DataFrame()
-        self.catergory_dict = {}
+        self.df = pd.read_excel(question_path, sheet_name='Question Info')
+
+        self.hist_dfs = {}
+        for period in survey_periods:
+            if period != 'P':
+                self.hist_dfs[period] = pd.read_excel(question_path, sheet_name=period)
+
         self.questions_dict = {}
+        for period in survey_periods:
+            self.questions_dict[period] = []
+
+        self.catergory_dict = {}
+        # self.questions_dict = {}
+
         self.scored_questions = []
+
         self.single_response_questions = []
         self.multi_response_questions = []
         self.text_response_questions = []
 
-
-        extension = question_path.split('.')[-1]
-        if extension == 'csv':
-            self.df = pd.read_csv(question_path)
-        elif extension == 'xlsx':
-            self.df = pd.read_excel(question_path, sheet_name='Question Info')
-
         self._generate_question_lists()
 
-        self.columns_to_score = self._get_columns_to_score()
+        # self._columns_to_score = self._get_columns_to_score()
+
+    def get_questions (self, period='P'):
+        return self.questions_dict[period]
 
     def __iter__(self):
-        return iter(self.questions_dict.values())
+        return iter(self.questions_dict['P'])
 
     def __len__(self):
-        return len(self.questions_dict)
+        return len(self.questions_dict['P'])
 
 
-    def _get_columns_to_score(self):
-        columns = []
-        for question in self.scored_questions:
-            columns = columns + question.question_columns
-        return columns
+    # def _get_columns_to_score(self):
+    #     columns = []
+    #     for question in self.scored_questions:
+    #         columns = columns + question.question_columns
+    #     return columns
 
     def _generate_question_lists(self):
         score_indices = [i for i, elem in enumerate(list(self.df.columns)) if 'S_' in elem[0:2]]
         response_indices = [i for i, elem in enumerate(list(self.df.columns)) if 'R_' in elem[0:2]]
 
-        for row in self.df.iterrows():
-            question_object = Question(row, score_indices, response_indices)
+        historic_score_indicies = [i for i, elem in enumerate(list(self.hist_dfs[list(self.hist_dfs.keys())[0]].columns)) if 'S_' in elem[0:2]]
+        historic_response_indicies = [i for i, elem in enumerate(list(self.hist_dfs[list(self.hist_dfs.keys())[0]].columns)) if 'R_' in elem[0:2]]
 
-            self.questions_dict[question_object.qid] = question_object
+
+        for row in self.df.iterrows():
+
+            row = row[1]
+            qid = row['QVAR']
+
+            question_hist_rows = {}
+            for period in self.hist_dfs:
+                df = self.hist_dfs[period]
+                series = (df.loc[df['QVAR']==qid]).iloc[0]
+                if isinstance(series['PQVAR'], float) and np.isnan(series['PQVAR']):
+                    pass
+                else:
+                    question_hist_rows[period] = series
+
+            #generate_question_object
+            question_object = Question(row, score_indices, response_indices, historic_score_indicies, historic_response_indicies, question_hist_rows)
+
+            # self.questions_dict[question_object.get_qid()] = question_object
 
             if question_object.category in self.catergory_dict.keys():
                 self.catergory_dict[question_object.category].append(question_object)
             else:
                 self.catergory_dict[question_object.category] = [question_object]
 
+
             if question_object.scored == 1:
                 self.scored_questions.append(question_object)
+
+            self.questions_dict['P'].append(question_object)
+            for period in question_hist_rows:
+                self.questions_dict[period].append(question_object)
 
             if question_object.q_type == 'S':
                 self.single_response_questions.append(question_object)
@@ -639,59 +727,116 @@ class Questions:
             elif question_object.q_type == 'F':
                 self.text_response_questions.append(question_object)
 
+
+
         return None
 
 class Question:
 
-    def __init__(self, q_row, score_indices, response_indices):
-        self.row = q_row
-        self.qid = q_row[1]['QVAR']
-        self.q_sort_int = q_row[0]
-        self.q_text = q_row[1]['QTEXT_FULL']
-        self.q_pos_text = q_row[1]['QTEXT_POSTEXT']
-        self.q_type = q_row[1]['TYPE']
-        self.scored = True if q_row[1]['SCORED'] == 1 else False
-        self.category = q_row[1]['CATEGORY']
-        self.online_qid = q_row[1]['ONLINE_QID']
-        self.paper_qid = q_row[1]['PAPER_QID']
+    def __init__(self, q_row, score_indices, response_indices, historic_score_indicies, historic_response_indicies, historic_rows):
+        self._qid = {'P': q_row['QVAR']}
+
+        self.q_text = q_row['QTEXT_FULL']
+        self.q_pos_text = q_row['QTEXT_POSTEXT']
+        self.q_type = q_row['TYPE']
+        self.scored = True if q_row['SCORED'] == 1 else False
+        self.category = q_row['CATEGORY']
+        self.online_qid = q_row['ONLINE_QID']
+        self.paper_qid = q_row['PAPER_QID']
 
         #map of response text to each response option
-        self.responses = self._get_response_map(q_row[1], response_indices)
+        self._responses = {'P': self._create_response_map(q_row, response_indices)}
 
         #map of score for each response option
-        self.score_map = self._get_score_map(q_row[1], score_indices)
-
+        self._score_map = {'P': self._create_score_map(q_row, score_indices)}
         # all scored responses
-        self.scored_responses = self._get_scored_responses()
+        self._scored_responses = {'P': self._create_scored_responses(self._score_map['P'])}
         # responses whos result contributes to a particular score
-        self.score_responses = self._get_score_responses()
+        self._score_responses = {'P': self._create_score_responses(self._score_map['P'])}
 
-        self.targeted = True if len(self.score_responses['ignore']) > 0 else False
 
         #all columns which belong to this question
-        self.question_columns = self._get_question_columns()
+        self._question_columns = {'P': self._create_question_columns(self._qid['P'], self.q_type, self._responses['P'])}
         # columns which are invovled in scoring (excluding ignore)
-        self.score_columns_dict = self._get_score_columns_dict()
+        self._score_columns_dict= {'P': self._screate_score_columns_dict(self._qid['P'], self.q_type, self._score_responses['P'])}
         # columns whos result contributes to a particular score
-        self.scored_columns = self._get_scored_columns()
+        self._scored_columns = {'P': self._create_scored_columns(self._qid['P'], self.q_type, self._scored_responses['P'])}
+
+        self.targeted = True if len(self._score_responses['P']['ignore']) > 0 else False
+
+        self.has_historic = True if len(historic_rows) > 0 else False
+
+        if self.has_historic:
+            for period in historic_rows:
+                historical_row = historic_rows[period]
+
+                if historical_row['PDIFF'] == 1:
+                    my_row = historical_row
+                    using_response_indices = historic_response_indicies
+                    using_score_indicies = historic_score_indicies
+                else:
+                    my_row = q_row
+                    using_response_indices = response_indices
+                    using_score_indicies = score_indices
+
+                self._qid[period] = historical_row['PQVAR']
+
+                self._responses[period] = self._create_response_map(my_row, using_response_indices)
+                self._score_map[period] = self._create_score_map(my_row, using_score_indicies)
+
+                self._scored_responses[period] = self._create_scored_responses(self._score_map[period])
+                self._score_responses[period] = self._create_score_responses(self._score_map[period])
+
+                self._question_columns[period] = self._create_question_columns(self._qid[period], self.q_type, self._responses[period])
+                self._scored_columns[period] = self._create_scored_columns(self._qid[period], self.q_type, self._scored_responses[period])
+
+                self._score_columns_dict[period] = self._screate_score_columns_dict(self._qid[period], self.q_type, self._score_responses[period])
+
+    #getters
+    def get_qid(self, period='P'):
+        return self._qid[period]
+
+    def get_responses(self, period='P'):
+        return self._responses[period]
+
+    def get_score_map(self, period='P'):
+        return self._score_map[period]
+
+    def get_scored_responses(self, period='P'):
+        return self._scored_responses[period]
+
+    def get_score_responses(self, period='P'):
+        return self._score_responses[period]
+
+    def get_question_columns(self, period='P'):
+        return self._question_columns[period]
+
+    def get_score_columns(self, period='P'):
+        return self._score_columns_dict[period]
+
+    def get_scored_columns(self, period='P'):
+        return self._scored_columns[period]
+
+
 
     @staticmethod
-    def _get_response_map(q_row, response_indices):
+    def _create_response_map(q_row, response_indices):
         mydict = {}
-        for i, x in enumerate(q_row[(response_indices[0]):(response_indices[-1])]):
+        for i, x in enumerate(q_row[(response_indices[0]):(response_indices[-1])+1]):
             if isinstance(x, str):
                 mydict[i] = x
         return mydict
 
     @staticmethod
-    def _get_score_map(q_row, score_indicies):
+    def _create_score_map(q_row, score_indicies):
         mydict = {}
-        for i, x in enumerate(q_row[(score_indicies[0]):(score_indicies[-1])]):
+        for i, x in enumerate(q_row[(score_indicies[0]):(score_indicies[-1])+1]):
             if not np.isnan(x):
                 mydict[i] = int(x)
         return mydict
 
-    def _get_score_responses(self):
+    @staticmethod
+    def _create_score_responses(score_map):
         mydict = {'pos': [],
                   'neu': [],
                   'neg': [],
@@ -699,52 +844,53 @@ class Question:
                   }
 
         for scoring_term in scoring_terms_dict:
-            for response_option in self.score_map:
+            for response_option in score_map:
                 # add to correct value
-                if self.score_map[response_option] == scoring_terms_dict[scoring_term]['value']:
+                if score_map[response_option] == scoring_terms_dict[scoring_term]['value']:
                     mydict[scoring_term].append(response_option)
 
         return mydict
 
-    def _get_scored_responses(self):
+    @staticmethod
+    def _create_scored_responses(score_map):
         mylist = []
-        for response_option in self.score_map:
+        for response_option in score_map:
             # if not an ignore vale
-            if self.score_map[response_option] != scoring_ignore_value:
+            if score_map[response_option] != scoring_ignore_value:
                 mylist.append(response_option)
         return mylist
 
-
-    def _get_question_columns(self):
+    @staticmethod
+    def _create_question_columns(qid, q_type, responses):
         mylist=[]
-        if self.q_type == 'M':
-            for option in self.responses:
-                mylist.append(f'{self.qid}_{option}')
-        elif self.q_type == 'S':
-            mylist.append(self.qid)
+        if q_type == 'M':
+            for option in responses:
+                mylist.append(f'{qid}_{option}')
+        elif q_type == 'S':
+            mylist.append(qid)
         return mylist
 
-    def _get_scored_columns(self):
+    @staticmethod
+    def _create_scored_columns(qid, q_type, scored_responses):
         mylist = []
-
-        if self.q_type == 'M':
-            for response_option in self.scored_responses:
-                mylist.append(f'{self.qid}_{response_option}')
-        elif self.q_type == 'S':
-            mylist.append(self.qid)
-
+        if q_type == 'M':
+            for response_option in scored_responses:
+                mylist.append(f'{qid}_{response_option}')
+        elif q_type == 'S':
+            mylist.append(qid)
         return mylist
 
-    def _get_score_columns_dict(self):
+    @staticmethod
+    def _screate_score_columns_dict(qid, q_type, score_responses):
         score_columns = {'pos': [],
                          'neu': [],
                          'neg': [],
                          'ignore': []}
 
-        if self.q_type == 'M':
-            for score_type in self.score_responses:
-                for x in self.score_responses[score_type]:
-                    score_columns[score_type].append(f'{self.qid}_{x}')
+        if q_type == 'M':
+            for score_type in score_responses:
+                for x in score_responses[score_type]:
+                    score_columns[score_type].append(f'{qid}_{x}')
 
         return score_columns
 
