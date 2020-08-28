@@ -29,6 +29,8 @@ scoring_ignore_value = scoring_terms_dict['ignore']['value']
 scored_values = [scoring_terms_dict[i]['value'] for i in scoring_terms_dict if i != 'ignore']
 score_suffixes = [scoring_terms_dict[i]['suffix'] for i in scoring_terms_dict if i != 'ignore']
 
+def add(a, b):
+    return a + b
 
 def _input_filetype(path, index_col):
     extension = path.split('.')[-1]

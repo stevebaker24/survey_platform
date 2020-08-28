@@ -1,6 +1,11 @@
-from survey_platform import survey_platform as sp
-import pandas as pd
+import os
+
 import numpy as np
+import pandas as pd
+
+from survey_platform import survey_platform as sp
+
+import math
 
 
 def get_score_df(source, questions, breakdown_field, score_types, period='P'):
@@ -30,16 +35,14 @@ def positivescoretable(source, questions, breakdown_field, suppression_threshold
     scored_df = get_score_df(source, questions, breakdown_field, ['pos', 'neu', 'neg'], period=period)
     mean_df = get_mean_df(scored_df, breakdown_field)
 
-    print('hello')
-
-    count_df = scored_df.rename(columns=lambda x: x + '_n' if x != breakdown_field else x) \
+    count_df = scored_df.rename(columns=lambda x: x + '.N' if x != breakdown_field else x) \
         .groupby(breakdown_field) \
         .count() \
         .transpose()
 
     # apply suppression mask to mean df
     mask = (count_df < suppression_threshold)
-    mask.index = mask.index.str.strip('_n')
+    mask.index = mask.index.str.strip('.N')
     mean_df = mean_df.mask(mask)
 
     # calculate the overall scores as dfs
@@ -60,13 +63,17 @@ def positivescoretable(source, questions, breakdown_field, suppression_threshold
     # name the index column
     output_df.index.name = 'Question'
 
-    #if site names needed:
+    # if site names needed:
     if level_prefix == 'L1':
         names = output_df.columns
         names_prefix = ['SITE_NAME_' + i for i in names]
         names_dict = dict(zip(names, names_prefix))
         series = (pd.Series(names_dict)).rename('NAME')
         output_df = output_df.append(series)
+
+    # path _pos.N to _NPos
+
+    output_df.index = output_df.index.str.replace('_pos.N', '_NPos')
 
     # save csv
     output_df.to_csv(rf'C:\Users\steve.baker\Desktop\MAT Nonsense\output\etabs\hello\{filename}.csv')
@@ -86,9 +93,9 @@ def minmeanmax(source, questions, breakdown_field, suppression_threshold=0):
     mask = (count_df < suppression_threshold)
     mean_df = mean_df.mask(mask)
 
-    table_dict = {'MIN(Current)': None,
-                  'MEAN(Current)': None,
-                  'MAX(Current)': None
+    table_dict = {'MIN (Current)': None,
+                  'MEAN (Current)': None,
+                  'MAX (Current)': None
                   }
 
     for breakdown in table_dict:
@@ -97,9 +104,8 @@ def minmeanmax(source, questions, breakdown_field, suppression_threshold=0):
         df.index = df.index.str.replace('_pos', f'_{aggregate_function}')
         table_dict[breakdown] = df
 
-
     # write all dfs to excell
-    writer = pd.ExcelWriter(rf'C:\Users\steve.baker\Desktop\MAT Nonsense\output\etabs\hello\MinMeanMax.xlsx',
+    writer = pd.ExcelWriter(rf'C:\Users\steve.baker\Desktop\MAT Nonsense\output\etabs\hello\MinMeanMax_CURRENT.xlsx',
                             engine='xlsxwriter')
 
     worksheet = writer.book.add_worksheet('MinMeanMax')
@@ -109,15 +115,19 @@ def minmeanmax(source, questions, breakdown_field, suppression_threshold=0):
     for table in table_dict:
         title = f'TABLE: {table}'
         worksheet.write(row, 0, title)
-        table_dict[table].to_excel(writer, startcol=0, startrow=row + 2)
+        table_dict[table].to_excel(writer, sheet_name='MinMeanMax', startcol=0, startrow=row + 2)
         row = row + len(table_dict[table]) + 4
 
     writer.save()
 
+    dfcsv = pd.read_excel(rf'C:\Users\steve.baker\Desktop\MAT Nonsense\output\etabs\hello\MinMeanMax_CURRENT.xlsx',
+                          sheet_name='MinMeanMax', header=None)
+    dfcsv.to_csv((rf'C:\Users\steve.baker\Desktop\MAT Nonsense\output\etabs\hello\MinMeanMax_CURRENT.csv'), index=0, header=0)
+    os.remove(rf'C:\Users\steve.baker\Desktop\MAT Nonsense\output\etabs\hello\MinMeanMax_CURRENT.xlsx')
+
 
 def ez(source, other_source, questions, source_breakdown_field, other_source_breakdown_field, level_prefix=None,
        suppression_threshold=0):
-
     # drop values in other_source_comparator not in source_comparator (i.e. trusts no longer in survey):
     source_comparator_values = source[source_breakdown_field].unique().tolist()
     other_source_indexes_to_remove = other_source[
@@ -132,8 +142,6 @@ def ez(source, other_source, questions, source_breakdown_field, other_source_bre
     mean_df = get_mean_df(scored_df, source_breakdown_field)
     mean_df_other = get_mean_df(scored_df_other, other_source_breakdown_field)
 
-
-
     # suppress mean dfs
     count_df = scored_df \
         .groupby(source_breakdown_field) \
@@ -144,7 +152,6 @@ def ez(source, other_source, questions, source_breakdown_field, other_source_bre
         .groupby(other_source_breakdown_field) \
         .count() \
         .transpose()
-
 
     # apply suppression mask to mean df
     mask = (count_df < suppression_threshold)
@@ -162,7 +169,6 @@ def ez(source, other_source, questions, source_breakdown_field, other_source_bre
     mean_df_picker_average = mean_df.mean(axis=1)
     mean_df_picker_average = mean_df_picker_average.mask(picker_average_mask)
 
-
     # rename question vars for output
     mean_df_other_output = mean_df_other.copy()
     mean_df_other_output.index = mean_df_other_output.index.str.replace('_pos', '_posh')
@@ -175,7 +181,6 @@ def ez(source, other_source, questions, source_breakdown_field, other_source_bre
     for item in mean_df.index:
         if item not in mean_df_other.index:
             indexes_to_drop.append(item)
-            print(item)
 
     mean_df_h_comparable = mean_df.drop(indexes_to_drop, axis=0)
     overall_pos = mean_df_h_comparable.mean(axis=0)
@@ -239,12 +244,11 @@ def ez(source, other_source, questions, source_breakdown_field, other_source_bre
     z_scored_historic.index = z_scored_historic.index.str.replace('_pos', '_Zh')
     # apply suppression mask here... I think
 
-    #add picker average suppression (unlikely to be needed but better to include)
+    # add picker average suppression (unlikely to be needed but better to include)
     z_scored_picker_average = calc_z(count_posn_df, count_scorable_df, count_posn_df_picker, count_scorable_df_picker)
     z_scored_picker_average = z_scored_picker_average.mask(mask)
     z_scored_picker_average = z_scored_picker_average.mask(picker_average_mask, axis=1)
     z_scored_picker_average.index = z_scored_picker_average.index.str.replace('_pos', '_Z')
-
 
     # determine sig or not (buckets)
     def determine_z_sig(z_scored_df):
@@ -312,10 +316,14 @@ def response(source, comparator, outcome_field, filename='response', level_prefi
 
     for outcome in outcome_options:
         source.loc[source[outcome_field].isin(outcome_options[outcome]), outcome] = 1
+        source[outcome_field]
 
     grouped_df = source.drop(outcome_field, axis=1).groupby(comparator).sum()
 
     grouped_df['Eligible'] = grouped_df['Invited'] - grouped_df['Ineligible']
+
+    grouped_df = grouped_df.astype(int)
+
     grouped_df['RR'] = (grouped_df['Response'] / grouped_df['Eligible']) * 100
     grouped_df['RR_mean'] = grouped_df['RR'].mean()
 
@@ -350,9 +358,10 @@ def site_n(source, questions, breakdown_field, l0_field):
     count_df.columns = count_df.columns.str.replace('_pos', '_respondents')
     count_df.index.name = 'SITE_CODE'
 
+    count_df = count_df.reset_index()
+    count_df = count_df.set_index('iD_CODE')
 
     count_df.to_csv(rf'C:\Users\steve.baker\Desktop\MAT Nonsense\output\etabs\hello\Site_N.csv')
-
 
 
 def survey_information(source, breakdown_field, outcome_field):
@@ -392,6 +401,7 @@ def survey_information(source, breakdown_field, outcome_field):
     dfconcat = pd.concat(dfs, axis=1).fillna(0).transpose()
     invited_df = dfconcat.sum().rename('Invited').to_frame().transpose()
     outcome_df = invited_df.append(dfconcat)
+    outcome_df.columns = 'L0' + outcome_df.columns
     dataframes['Outcome'] = outcome_df
 
     # Organisation_Type (needs dict)
@@ -410,16 +420,177 @@ def survey_information(source, breakdown_field, outcome_field):
     writer = pd.ExcelWriter(rf'C:\Users\steve.baker\Desktop\MAT Nonsense\output\etabs\hello\SurveyInformation.xlsx',
                             engine='xlsxwriter')
 
-    worksheet = writer.book.add_worksheet('SurveyInformation')
-    writer.sheets['SurveyInformation'] = worksheet
+    worksheet = writer.book.add_worksheet('Management Report')
+    writer.sheets['Management Report'] = worksheet
 
     row = 0
     for table in dataframes:
         title = f'TABLE: {table}'
         worksheet.write(row, 0, title)
-        dataframes[table].to_excel(writer, startcol=0, startrow=row + 2)
+        dataframes[table].to_excel(writer, sheet_name='Management Report', startcol=0, startrow=row + 2)
         row = row + len(dataframes[table]) + 4
 
     writer.save()
 
-    print('hello')
+
+def improvement_maps(source, questions, breakdown_field, suppression_threshold, level_prefix):
+    #SUPPRESSION/Handle NaNs
+
+
+    category_dict = {
+        'SECTION B': {'B4': 0.399,
+                      'B6': 0.520,
+                      'B8': 0.503,
+                      'B9': 0.481,
+                      'B10': 0.422,
+                      'B11': 0.444,
+                      'B12': 0.398,
+                      'B13': 0.088,
+                      'B14': 0.343,
+                      'B15': 0.417,
+                      'B16': 0.175},
+        'SECTION C-D': {'C1': 0.399,
+                        'C10': 0.520,
+                        'C11': 0.503,
+                        'C12': 0.481,
+                        'C14': 0.422,
+                        'C15': 0.444,
+                        'C16': 0.398,
+                        'C17': 0.088,
+                        'C18': 0.343,
+                        'C19': 0.417,
+                        'C20': 0.175,
+                        'C21': 0.547,
+                        'D2': 0.452,
+                        'D4': 0.247,
+                        'D5': 0.547,
+                        'D6': 0.369,
+                        'D7': 0.198,
+                        'D8': 0.025},
+        'SECTION E-F': {'E2': 0.124,
+                        'E3': 0.548,
+                        'F1': 0.412,
+                        'F2': 0.214,
+                        'F3': 0.324,
+                        'F6': 0.741,
+                        'F7': 0.415,
+                        'F8': 0.562,
+                        'F9': 0.234,
+                        'F10': 0.415,
+                        'F12': 0.012,
+                        'F13': 0.058,
+                        'F14': 0.054,
+                        'F15': 0.047,
+                        'F16': 0.526,
+                        'F17': 0.741,
+                        'F18': 0.222}
+    }
+    scored_df = get_score_df(source, questions, breakdown_field, ['pos'], period='P')
+    mean_df = get_mean_df(scored_df, breakdown_field)
+
+    #suppress mean_df
+    count_df = scored_df \
+        .groupby(breakdown_field) \
+        .count() \
+        .transpose()
+
+    # apply suppression mask to mean df
+    mask = (count_df < suppression_threshold)
+    mean_df = mean_df.mask(mask)
+
+
+    if level_prefix is not None:
+        mean_df.columns = level_prefix + mean_df.columns
+
+    dfinput = mean_df.transpose()
+
+    writer = pd.ExcelWriter(rf'C:\Users\steve.baker\Desktop\MAT Nonsense\output\etabs\hello\ImprovementMaps_All.xlsx', engine='xlsxwriter')
+
+    for category in category_dict:
+        category_qs = category_dict[category]
+
+        pos_columns = [i + '_pos' for i in category_qs]
+
+        df = dfinput[pos_columns]
+
+        df['ID_CODE'] = df.index
+        df = df.melt(id_vars='ID_CODE')
+        df = df.rename({'variable': 'QUESTION', 'value': 'POS_SCORE'}, axis=1)
+
+        question_list = questions.questions_dict['P']
+        pos_text_mapping_dict = {n.get_qid(): n.q_pos_text for n in question_list}
+
+        group_df = df[['QUESTION', 'POS_SCORE']].groupby('QUESTION').mean()
+
+        group_df = group_df.rename({'POS_SCORE': 'AVERAGE'}, axis=1)
+
+        group_df['SECTION'] = category
+        group_df['CORRELATION'] = category_qs.values()
+
+        group_df['MIN'] = np.nanmin(group_df['CORRELATION'])
+        group_df['MAX'] = np.nanmax(group_df['CORRELATION'])
+        group_df['RANGE'] = np.nanmax(group_df['CORRELATION']) - np.nanmin(group_df['CORRELATION'])
+
+        df_new = pd.merge(left=df, right=group_df, how='left', left_on='QUESTION', right_on=group_df.index)
+
+        df_new = df_new.sort_values('ID_CODE')
+
+        df_new['QLABEL'] = df_new['QUESTION'].str.rstrip('_pos')
+        df_new['SHORT_TEXT'] = df_new['QLABEL'].map(pos_text_mapping_dict)
+
+        df_new['IMPORTANCE'] = (df_new['CORRELATION'] - df_new['MIN'])/(df_new['RANGE'])
+
+        #handle NaNs here perhaps...
+        df_new['CENTRED_SCORE'] = (df_new['POS_SCORE'] - df_new['AVERAGE'])
+
+        trusts = df_new['ID_CODE'].unique().tolist()
+
+        trusts_list = []
+
+        for trust in trusts:
+            trust_df = df_new[df_new['ID_CODE'] == trust]
+            xmin = np.nanmin(trust_df['CENTRED_SCORE'])
+            xmax = np.nanmax(trust_df['CENTRED_SCORE'])
+
+            xaxiscalcmin = -20 if (xmin > -20 or np.isnan(xmin)) else xmin
+            #round up
+            trust_df['XAXISCALCMIN'] = math.floor(xaxiscalcmin)
+
+            xaxiscalcmax = 20 if (xmax < 20 or np.isnan(xmax)) else xmax
+            trust_df['XAXISCALCMAX'] = math.ceil(xaxiscalcmax)
+
+            xaxismax = max(abs(xaxiscalcmin), abs(xaxiscalcmax))
+            xaxismin = -1 * xaxismax
+
+            trust_df['XAXIS_MIN'] = math.floor(xaxismin)
+            trust_df['XAXIS_MAX'] = math.ceil(xaxismax)
+
+            trust_df['XAXIS_UNIT'] = math.ceil(xaxismax)
+            trust_df['XAXIS_MID'] = 0
+
+            trusts_list.append(trust_df)
+
+        combineddf = trusts_list[0]
+
+        for i, x in enumerate(trusts_list):
+            if i != 0:
+                combineddf = combineddf.append(x)
+
+        combineddf['QUADRANT'] = ''
+
+        for i, row in combineddf.iterrows():
+            if row['CENTRED_SCORE'] >= 0 and row['IMPORTANCE'] > 0.5:
+                combineddf.loc[i, 'QUADRANT'] = 'MAINTAIN'
+            if row['CENTRED_SCORE'] >= 0 and row['IMPORTANCE'] <= 0.5:
+                combineddf.loc[i, 'QUADRANT'] = 'MONITOR'
+            if row['CENTRED_SCORE'] < 0 and row['IMPORTANCE'] > 0.5:
+                combineddf.loc[i, 'QUADRANT'] = 'DEVELOP'
+            if row['CENTRED_SCORE'] < 0 and row['IMPORTANCE'] <= 0.5:
+                combineddf.loc[i, 'QUADRANT'] = 'MANAGE'
+
+        combineddf['SUM'] = 1
+
+        combineddf.to_excel(writer, index=False, sheet_name=category)
+
+    writer.save()
+    pass
