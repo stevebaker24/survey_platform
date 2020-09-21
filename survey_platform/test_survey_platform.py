@@ -1,4 +1,4 @@
-from survey_platform.survey_platform import *
+from survey_platform.surveyplatform import *
 
 a = 5
 b = 6

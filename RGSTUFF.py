@@ -1,4 +1,4 @@
-from survey_platform import survey_platform as sp
+from survey_platform import surveyplatform as sp
 
 questions = sp.Questions(r"C:\Users\steve.baker\Desktop\RG\questions.xlsx")
 

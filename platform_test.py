@@ -1,4 +1,4 @@
-from survey_platform import survey_platform as sp
+from survey_platform import surveyplatform as sp
 import timeit
 
 repeats = 1
