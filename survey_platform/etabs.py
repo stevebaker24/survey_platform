@@ -3,57 +3,9 @@ import os
 import numpy as np
 import pandas as pd
 
-from survey_platform import surveyplatform as sp
+from . import survey_platform as sp, config
 
 import math
-
-
-
-l0_name_map = {'RTK': 'Ashford and St Peter\'s Hospitals NHS Foundation Trust',
-                  'R1H': 'Barts Health NHS Trust',
-                  'RXQ': 'Buckinghamshire Healthcare NHS Trust',
-                  'RN7': 'Dartford and Gravesham NHS Trust',
-                  'RTE': 'Gloucestershire Hospitals NHS Foundation Trust',
-                  'RN5': 'Hampshire Hospitals NHS Foundation Trust',
-                  'RXN': 'Lancashire Teaching Hospitals NHS Foundation Trust',
-                  'RJ2': 'Lewisham and Greenwich NHS Trust',
-                  'R1K': 'London North West University Healthcare NHS Trust',
-                  'R0A': 'Manchester University NHS Foundation Trust',
-                  'RXF': 'Mid Yorkshire Hospitals NHS Trust',
-                  'RX1': 'Nottingham University Hospitals NHS Trust',
-                  'RQW': 'The Princess Alexandra Hospital NHS Trust',
-                  'RH8': 'Royal Devon and Exeter NHS Foundation Trust'}
-
-l1_name_map = {'R0A05': 'ST MARY\'S HOSPITAL',
-                 'R0A07': 'WYTHENSHAWE HOSPITAL',
-                 'R1H12': 'THE ROYAL LONDON HOSPITAL',
-                 'R1H41': 'BARKING BIRTH CENTRE',
-                 'R1H90': 'BLT BIRTH CENTRE',
-                 'R1HKH': 'WHIPPS CROSS UNIVERSITY HOSPITAL',
-                 'R1HNH': 'NEWHAM GENERAL HOSPITAL',
-                 'RJ224': 'UNIVERSITY HOSPITAL LEWISHAM',
-                 'RJ231': 'QUEEN ELIZABETH HOSPITAL',
-                 'RN506': 'BASINGSTOKE AND NORTH HAMPSHIRE HOSPITAL',
-                 'RN541': 'ROYAL HAMPSHIRE COUNTY HOSPITAL',
-                 'RN542': 'ANDOVER WAR MEMORIAL HOSPITAL',
-                 'RTE01': 'CHELTENHAM GENERAL HOSPITAL',
-                 'RTE03': 'GLOUCESTERSHIRE ROYAL HOSPITAL',
-                 'RTE27': 'STROUD MATERNITY HOSPITAL',
-                 'RTK01': 'ST PETER\'S HOSPITAL',
-                 'RX1CC': 'NOTTINGHAM UNIVERSITY HOSPITALS NHS TRUST - CITY CAMPUS',
-                 'RX1RA': 'NOTTINGHAM UNIVERSITY HOSPITALS NHS TRUST - QUEEN\'S MEDICAL CENTRE CAMPUS',
-                 'RXF03': 'PONTEFRACT GENERAL INFIRMARY',
-                 'RXF05': 'PINDERFIELDS GENERAL HOSPITAL',
-                 'RXF10': 'DEWSBURY & DISTRICT HOSPITAL',
-                 'RXN01': 'CHORLEY & SOUTH RIBBLE HOSPITAL',
-                 'RXN02': 'ROYAL PRESTON HOSPITAL',
-                 'RXQ02': 'STOKE MANDEVILLE HOSPITAL',
-                 'RXQ50': 'WYCOMBE HOSPITAL',
-                 'RH801': 'ROYAL DEVON & EXETER HOSPITAL (WONFORD)',
-                 'RN707': 'DARENT VALLEY'}
-
-
-
 
 
 def get_score_df(source, questions, breakdown_field, score_types, period='P'):
@@ -95,7 +47,7 @@ def positivescoretable(source, questions, breakdown_field, suppression_threshold
 
     # calculate the overall scores as dfs
     overall_dfs = []
-    for suffix in sp.score_suffixes:
+    for suffix in config.score_suffixes:
         overall_dfs.append(mean_df[mean_df.index.str.contains(suffix)].mean().rename(f'Overall{suffix}'))
 
     # append all the different dfs
@@ -116,8 +68,8 @@ def positivescoretable(source, questions, breakdown_field, suppression_threshold
         names = output_df.columns
         names_prefix = []
         for i in names:
-            if i[2:] in l1_name_map.keys():
-                site_name = l1_name_map[i[2:]]
+            if i[2:] in config.l1_name_map.keys():
+                site_name = config.l1_name_map[i[2:]]
             else:
                 site_name = ''
             names_prefix.append(site_name)
@@ -371,7 +323,6 @@ def response(source, comparator, outcome_field, filename='response', level_prefi
 
     for outcome in outcome_options:
         source.loc[source[outcome_field].isin(outcome_options[outcome]), outcome] = 1
-        source[outcome_field]
 
     grouped_df = source.drop(outcome_field, axis=1).groupby(comparator).sum()
 
@@ -407,7 +358,7 @@ def site_n(source, questions, breakdown_field, l0_field):
         site_map[site] = l0_value
 
     count_df['iD_CODE'] = count_df.index.map(site_map)
-    count_df['SiteName'] = count_df.index.map(l1_name_map)
+    count_df['SiteName'] = count_df.index.map(config.l1_name_map)
 
     count_df.index = 'L1' + count_df.index
     count_df.columns = count_df.columns.str.replace('_pos', '_respondents')
@@ -435,9 +386,9 @@ def survey_information(source, breakdown_field, outcome_field, level_prefix=None
     hello = source[breakdown_field].value_counts().to_frame()
 
     if level_prefix == 'L0':
-        hello['Name'] = hello.index.map(l0_name_map)
+        hello['Name'] = hello.index.map(config.l0_name_map)
     elif level_prefix == 'L1':
-        hello['Name'] = hello.index.map(l1_name_map)
+        hello['Name'] = hello.index.map(config.l1_name_map)
 
     hello.index = level_prefix + hello.index
 

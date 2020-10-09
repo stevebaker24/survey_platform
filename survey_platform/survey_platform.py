@@ -1,13 +1,11 @@
-from pathlib import Path
-
-from survey_platform import config
-
-import numpy as np
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-import xlsxwriter
+import math
 
+from .questions import Questions
+from . import config
+
+def sanitise_for_path(string):
+    return string.replace("/", "")
 
 def create_worksheet_name(worksheet_name):
     for char in [':', '\\', '/', '?', '*', '[', ']']:
@@ -26,44 +24,30 @@ def _input_filetype(path, index_col):
         return pd.read_excel(path, index_col=index_col)
 
 
-#this should for part of a module to import
-def z_test(pos_n_two, scorable_n_two, pos_n_one, scorable_n_one):
-    p1 = (pos_n_one + 1) / (scorable_n_one + 2)
-    p2 = (pos_n_two + 1) / (scorable_n_two + 2)
+def calc_scores(df, questions, score_types=None):
+    df = df.copy()
 
-    nominator = (p1 - p2)
+    if score_types is None:
+        score_types = ['pos']
 
-    denominator1 = (p1 * (1 - p1)) / (scorable_n_one + 2)
-    denominator2 = (p2 * (1 - p2)) / (scorable_n_two + 2)
-    denominator = math.sqrt(denominator1 + denominator2)
-
-    return nominator / denominator
-
-
-### multi respinse options questions.
-
-def calc_scores(df, questions, score_types=['pos'], period='P'):
     for question in questions.scored_questions:
 
-        question_score_response_dict = question.get_score_responses(period=period)
-        scored_responses = question.get_scored_responses(period=period)
-        scored_columns = question.get_scored_columns(period=period)
+        question_score_response_dict = question.score_responses
+        scored_responses = question.scored_responses
+        scored_columns = question.scored_columns
 
-
-        current_qid = question.get_qid('P')
-        #qid = question.get_qid(period)
-
+        qid = question.qid
 
         for score in score_types:
-            score_column_header = current_qid + scoring_terms_dict[score]['suffix']
+            score_column_header = f'{qid}{config.scoring_terms_dict[score]["suffix"]}'
 
-            #drop if alreay in the output column set.
+            # drop if alreay in the output column set.
             if score_column_header in df.columns:
                 print(score_column_header)
                 df = df.drop(score_column_header, axis=1)
 
             if question.q_type == 'M':
-                score_columns = question.get_score_columns(period)[score]
+                score_columns = question.score_columns[score]
 
                 df.loc[df[scored_columns].sum(axis=1) > 0, score_column_header] = 0
                 df.loc[df[score_columns].sum(axis=1) > 0, score_column_header] = 100
@@ -77,10 +61,7 @@ def calc_scores(df, questions, score_types=['pos'], period='P'):
 
     return df
 
-
-
-
-
+# Temporary
 class Sample:
 
     def __init__(self, sample_path, indexcol):
@@ -92,7 +73,7 @@ class Sample:
 
 class Responses:
 
-    def __init__(self, responses_path, indexcol, period=None, questions=None, breakdown_field=None, breakdown_field_values=None, master_breakdown_field=None):
+    def __init__(self, responses_path, indexcol):
         self.df = _input_filetype(responses_path, indexcol)
 
 

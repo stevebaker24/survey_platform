@@ -1,0 +1,14 @@
+name: survey_platform
+channels:
+  - defaults
+dependencies:
+  - python=3.8
+  - pandas
+  - pyarrow
+  - pendulum
+  - seaborn
+  - openpyxl
+  - xlsxwriter
+  - flask
+  - flask-wtf
+
