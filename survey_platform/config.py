@@ -4,6 +4,14 @@ from pathlib import Path
 P_QUESTION_SHEET = 'Question Info'
 PERIOD_IDENTIFIER = 'P-'
 
+# Default Text
+DEFAULT_SURVEY_NAME = 'Picker Survey'
+DEFAULT_FILL_VALUE = 'None'
+
+# Suppression
+# Default is the highest for fail-safe
+DEFAULT_SUPPRESSION_LIMIT = 30
+
 # Column Headers
 HEAD_QVAR = 'QID'
 HEAD_PQVAR = 'P_QID'
@@ -29,7 +37,7 @@ SUPPRESSION_SYMBOL = '*'
 # Excel Extensions
 EXCEL_EXTS = ['.xlsx', '.xls']
 
-output_path = Path(r'C:\Users\steve.baker\Desktop\MAT Nonsense')
+DEFAULT_OUTPUT_PATH = Path(r'C:\Users\steve.baker\Desktop\MAT Nonsense')
 
 scoring_terms_dict = {'pos': {'value': 1, 'string': 'Positive', 'suffix': '_pos'},
                       'neu': {'value': 2, 'string': 'Neutral', 'suffix': '_neu'},

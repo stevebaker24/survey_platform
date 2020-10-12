@@ -21,30 +21,6 @@ def write_breakdown_level_names(df, worksheet, row, start_column, workbook_forma
             worksheet.write((row + index), start_column - 1, level_name, workbook_format)
 
 
-# def write_headers(df, worksheet, row, start_column, workbook_format):
-#     # write the columns
-#     for level in range(df.columns.nlevels):
-#         values = df.columns.get_level_values(level)
-#
-#         start_merge_index = 0
-#         header_row = row + level
-#         number_values = len(values)
-#
-#         for index, value in enumerate(values):
-#             # If the next value is different or it is the last value in the list.
-#             if index == number_values - 1 or values[index + 1] != value:
-#                 # if no merge needed, write only a single cell
-#                 if index == start_merge_index:
-#                     worksheet.write(header_row, (start_column + index), value, workbook_format)
-#                 # if there are multiple cells, write as a merge
-#                 else:
-#                     worksheet.merge_range(header_row, (start_column + start_merge_index), header_row,
-#                                           (start_column + index),
-#                                           value, workbook_format)
-#                 # set the inde for the start of the next merge set.
-#                 start_merge_index = index + 1
-
-
 def write_headers(df, worksheet, row, start_column, workbook_format):
     header_row = row
     number_of_levels = df.columns.nlevels
@@ -167,7 +143,7 @@ def get_frequency_table(source, questions, suppression_threshold=0, sheet_breakd
     df = source.copy()
 
     output_path = r'C:\Users\steve.baker\Desktop\MAT Nonsense\output\freq' if output_path is None else output_path
-    workbook = xlsxwriter.Workbook(f'{output_path}\\{sp.sanitise_for_path(file_name)}Frequency_Table_Report.xlsx')
+
 
     # Spreadsheet formats
     formats = {key: workbook.add_format(value) for (key, value) in frequency_table_config.FORMATS.items()}
