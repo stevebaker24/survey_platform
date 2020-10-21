@@ -7,7 +7,7 @@ from . import config
 def sanitise_for_path(string):
     return string.replace("/", "")
 
-def create_worksheet_name(worksheet_name):
+def sanitize_worksheet_name(worksheet_name):
     for char in [':', '\\', '/', '?', '*', '[', ']']:
         worksheet_name = worksheet_name.replace(char, '')
         return worksheet_name[:31]

@@ -15,7 +15,7 @@ def get_frequency_table(source, questions, suppression_threshold=0, sheet_breakd
 
     sheet_breakdown_fields = ['Total'] if sheet_breakdown_fields is None else sheet_breakdown_fields
     for sheet_breakdown_field in sheet_breakdown_fields:
-        worksheet = workbook.add_worksheet(sp.create_worksheet_name(sheet_breakdown_field))
+        worksheet = workbook.add_worksheet(sp.sanitize_worksheet_name(sheet_breakdown_field))
 
         # workseet general formatting and setup
         worksheet.hide_gridlines(2)

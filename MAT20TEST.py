@@ -1,21 +1,14 @@
 from survey_platform import survey_platform as sp
 from survey_platform import frequency_table_legacy as ft
-from survey_platform import frequency_table as ft2
 
 questions = sp.Questions.from_file(
     r"C:\Users\steve.baker\Desktop\MAT Nonsense\NMEC20 POS SCORE MAPPING V1.1 RAG format SB.xlsx")
 
-responses = sp.Responses(r"C:\Users\steve.baker\Desktop\MAT Nonsense\matcleanoutput.csv", indexcol='PRN')
-sample = sp.Sample(r"C:\Users\steve.baker\Desktop\MAT Nonsense\sample\sample.xlsx", indexcol='Record number')
+responses = sp.Responses(r"C:\Users\steve.baker\Desktop\MAT Nonsense\FINAL NMEC DATA\NMEC20 COMBINED RESPONSES CLEANED.csv", indexcol='PRN')
+sample = sp.Sample(r"C:\Users\steve.baker\Desktop\MAT Nonsense\FINAL NMEC DATA\NMEC20 FINAL SAMPLE.xlsx", indexcol='Record number')
 combined = sp.Combined(sample, responses)
 
-#scored = sp.calc_scores(combined.df, questions)
-
-
-ft.get_frequency_table(source=combined.df, questions=questions, sheet_breakdown_fields=[['Place of birth: NHS site code', 'Extra1', 'Extra2']], suppression_threshold=30)
-print('done')
-
-
+ft.get_frequency_table(source=combined.df, questions=questions, sheet_breakdown_fields=[['Place of birth: NHS site code', 'Extra1', 'Extra2']], suppression_threshold=30, output_path=r'C:\Users\steve.baker\Desktop\MAT Nonsense\output\freq')
 
 print('hello')
 

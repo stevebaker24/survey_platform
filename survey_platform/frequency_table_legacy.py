@@ -1,9 +1,9 @@
-import xlsxwriter
-import pandas as pd
 import numpy as np
+import pandas as pd
+import xlsxwriter
 
-from . import survey_platform as sp
 from . import config, frequency_table_config
+from . import survey_platform as sp
 
 
 def write_row_from_df(df_row, worksheet, row, column, format_count, format_percent):
@@ -144,6 +144,7 @@ def get_frequency_table(source, questions, suppression_threshold=0, sheet_breakd
 
     output_path = r'C:\Users\steve.baker\Desktop\MAT Nonsense\output\freq' if output_path is None else output_path
 
+    workbook = xlsxwriter.Workbook(f'{output_path}\\{sp.sanitise_for_path(file_name)}Frequency_Table_Report.xlsx')
 
     # Spreadsheet formats
     formats = {key: workbook.add_format(value) for (key, value) in frequency_table_config.FORMATS.items()}
@@ -162,7 +163,7 @@ def get_frequency_table(source, questions, suppression_threshold=0, sheet_breakd
             numbreakdowns = 1
             worksheetname = sheet_breakdown_field
 
-        worksheet = workbook.add_worksheet(sp.create_worksheet_name(worksheetname))
+        worksheet = workbook.add_worksheet(sp.sanitize_worksheet_name(worksheetname))
 
         # workseet general formatting and setup
         worksheet.hide_gridlines(2)
