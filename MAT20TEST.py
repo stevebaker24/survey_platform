@@ -1,16 +1,34 @@
 from survey_platform import survey_platform as sp
-from survey_platform import frequency_table_legacy as ft
+from survey_platform import rag
+from survey_platform import freq_table as ft
+from survey_platform import sesreport
+from survey_platform import report
 
 questions = sp.Questions.from_file(
     r"C:\Users\steve.baker\Desktop\MAT Nonsense\NMEC20 POS SCORE MAPPING V1.1 RAG format SB.xlsx")
 
-responses = sp.Responses(r"C:\Users\steve.baker\Desktop\MAT Nonsense\FINAL NMEC DATA\NMEC20 COMBINED RESPONSES CLEANED.csv", indexcol='PRN')
-sample = sp.Sample(r"C:\Users\steve.baker\Desktop\MAT Nonsense\FINAL NMEC DATA\NMEC20 FINAL SAMPLE.xlsx", indexcol='Record number')
+responses = sp.Responses(
+    r"C:\Users\steve.baker\Desktop\MAT Nonsense\FINAL NMEC DATA\NMEC20 COMBINED RESPONSES CLEANED.csv", indexcol='PRN')
+sample = sp.Sample(r"C:\Users\steve.baker\Desktop\MAT Nonsense\FINAL NMEC DATA\NMEC20 FINAL SAMPLE.xlsx",
+                   indexcol='Record number')
 combined = sp.Combined(sample, responses)
+combined.df = combined.df[combined.df['Outcome'] == 1]
 
-ft.get_frequency_table(source=combined.df, questions=questions, sheet_breakdown_fields=[['Place of birth: NHS site code', 'Extra1', 'Extra2']], suppression_threshold=30, output_path=r'C:\Users\steve.baker\Desktop\MAT Nonsense\output\freq')
+# ft.get_frequency_table(source=combined.df, questions=questions, sheet_breakdown_fields=['Place of birth: NHS site code'], suppression_threshold=30, output_path=r'C:\Users\steve.baker\Desktop\MAT Nonsense\output\freq')
 
-print('hello')
+# ft.create_ft(source=combined.df, questions=questions, sheet_breakdown_fields=['Extra2'], suppression_threshold=30, output_path=r'C:\Users\steve.baker\Desktop\MAT Nonsense\output\freq')
+
+# rag.create_rag(source=combined.df, questions=questions, sheet_breakdown_fields=[['Extra1', 'Extra2'], 'Extra1'], suppression_threshold=30, output_path=r'C:\Users\steve.baker\Desktop\MAT Nonsense\output\freq')
+
+for trust in combined.df['Trust code'].unique():
+    trustdata = combined.df[combined.df['Trust code'] == trust]
+
+    #trust code into file name.
+
+    sesreport.create_ses(source=trustdata, questions=questions, sheet_breakdown_fields=[['Extra1', 'Extra2'], 'Extra1'],
+                         suppression_threshold=10, output_path=r'C:\Users\steve.baker\Desktop\MAT Nonsense\output\freq',
+                         external_comparator=combined.df, comparator_text='Picker Average',
+                         overall_text='Your Organisation')
 
 # responses_histroic_all = sp.Responses(r"C:\Users\steve.baker\PycharmProjects\python-scripts\historicmatcleanoutput.csv", indexcol='Recordnumber')
 # responses_histroic_p_1 = responses_histroic_all.df[responses_histroic_all.df['SURVEY'] == 'MAT19']

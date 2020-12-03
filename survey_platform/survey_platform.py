@@ -1,8 +1,7 @@
 import pandas as pd
 import math
 
-from .questions import Questions
-from . import config
+import config
 
 def sanitise_for_path(string):
     return string.replace("/", "")
@@ -15,9 +14,9 @@ def sanitize_worksheet_name(worksheet_name):
 def _input_filetype(path, index_col):
     extension = path.split('.')[-1]
     if extension == "csv":
-        return pd.read_csv(path, index_col=index_col)
+        return pd.read_csv(path, index_col=index_col, low_memory=False)
     if extension == "tsv":
-        return pd.read_csv(path, sep='\t', index_col=index_col, encoding='utf-16')
+        return pd.read_csv(path, sep='\t', index_col=index_col, low_memory=False, encoding='utf-16')
     elif extension == "parquet":
         return pd.read_parquet(path, engine='pyarrow')
     if extension == "xlsx":

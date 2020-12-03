@@ -3,8 +3,8 @@ import numpy as np
 from openpyxl import load_workbook
 from pathlib import Path
 
-from .question import Question
-from . import config
+from question import Question
+import config
 
 
 class Questions:

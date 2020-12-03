@@ -23,11 +23,7 @@ def get_score_df(source, questions, breakdown_field, score_types, period='P'):
     return scored_df
 
 
-def get_mean_df(scored_df, breakdown_field):
-    mean_df = scored_df.groupby(breakdown_field) \
-        .mean() \
-        .transpose()
-    return mean_df
+
 
 
 def positivescoretable(source, questions, breakdown_field, suppression_threshold, period='P', filename='posscoretable',
