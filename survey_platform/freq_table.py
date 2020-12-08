@@ -134,13 +134,13 @@ def combine_count_percent_dfs(df_count, df_percent):
 
 
 class FrequencyTableReport(report.Report):
-    def __init__(self, source, output_path, questions, sheet_breakdown_fields, suppression_threshold, survey_name):
+    def __init__(self, source, output_path, questions, sheet_breakdown_fields, suppression_threshold, survey_name, report_name, file_name):
         self.workbook_class = FrequencyTableWorkbook
         self.worksheet_class = FrequencyTableWorksheet
         self.report_name = 'Frequency Table Report'
 
         super().__init__(source, output_path, questions, sheet_breakdown_fields, suppression_threshold,
-                         survey_name=survey_name)
+                         survey_name=survey_name, report_name=report_name, file_name=file_name)
 
 
 class FrequencyTableWorkbook(report.ReportWorkbook):
@@ -247,6 +247,10 @@ class FrequencyTableWorksheet(report.ReportWorksheet):
         if responses_bool:
             report.write_headers(crosstabdict['table'], self.worksheet, row, starter_column + 2,
                                  self.formats['HEADER'])
+
+            #set header row height for all levels
+            for i in list(range(self.number_of_breakdowns)):
+                self.worksheet.set_row(i+row, frequency_table_config.HEADER_ROW_HEIGHT)
 
         row += self.number_of_breakdowns
 

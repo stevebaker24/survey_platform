@@ -6,9 +6,6 @@ import config
 import survey_platform as sp
 
 
-
-
-
 def get_agg_df(data: pd.DataFrame, breakdown_field: list, agg_method: str) -> pd.DataFrame:
     """aggregates a df either by the breakdown field list, or if there is to be no breakdown, just aggregate"""
 
@@ -23,7 +20,7 @@ def get_agg_df(data: pd.DataFrame, breakdown_field: list, agg_method: str) -> pd
     df = eval(f'df.{agg_method}().transpose()')
 
     # If there are blanks, meove the ZZZZ which is there to keep them at the back alphabetically
-    df = df.rename({'ZZZZZBLANK': 'BLANK'}, axis='columns')
+    df = df.rename({f'ZZZZZ{config.BLANK_STR}': config.BLANK_STR}, axis='columns')
 
     return df
 
@@ -123,6 +120,8 @@ class Report:
                  suppression_framework=None,
                  external_comparator=None,
                  comparator_text=None,
+                 report_name=None,
+                 file_name=None,
                  overall_text='Overall'):
 
         self.source = source
@@ -135,13 +134,39 @@ class Report:
         self.suppression_framework = suppression_framework
 
         self.output_path = config.DEFAULT_OUTPUT_PATH if output_path is None else Path(output_path)
-        self.file_name = survey_name
+        self.file_name = file_name if file_name is not None else survey_name
         self.survey_name = survey_name
+        self.report_name = report_name if report_name is not None else self.report_name
 
-        self.sheet_breakdown_fields = sheet_breakdown_fields
+        self.sheet_breakdown_fields = self.breakdown_sheets_question_map(sheet_breakdown_fields)
 
         # Create the correct ReportWorkbook object
         self.workbook_class(self)
+
+    def breakdown_sheets_question_map(self, sheet_breakdown_fields):
+        """If there are any qid in the breakdown columns, replace them with the mapped values representing
+        the question text and response option text"""
+
+        single_qids = [q.qid for q in self.questions.single_response_questions]
+
+        # repetitve + needs refactoring but works for now
+        for i, x in enumerate(sheet_breakdown_fields):
+            if isinstance(x, list):
+                for j, k in enumerate(x):
+                    if k in single_qids:
+                        q = self.questions.get_by_qid(k)
+                        breakdown_text = f"{q.breakdown_text} ({q.qid})"
+                        sheet_breakdown_fields[i][j] = breakdown_text
+                        with pd.option_context('mode.chained_assignment', None):
+                            self.source[breakdown_text] = self.source[q.qid].map(q.response_options)
+            if x in single_qids:
+                q = self.questions.get_by_qid(x)
+                breakdown_text = f"{q.breakdown_text} ({q.qid})"
+                sheet_breakdown_fields[i] = breakdown_text
+                with pd.option_context('mode.chained_assignment', None):
+                    self.source[breakdown_text] = self.source[q.qid].map(q.response_options)
+
+        return sheet_breakdown_fields
 
 
 class ReportWorkbook:
@@ -166,10 +191,10 @@ class ReportWorkbook:
         # The type of worksheet class being used, defined in child class
         self.worksheet_class = parent_report.worksheet_class
 
-        self.file_name = parent_report.file_name
         self.report_name = parent_report.report_name
 
-        self.file_name = f"{sp.sanitise_for_path(self.file_name)}_{self.report_name}.xlsx"
+        self.file_name = f"{sp.sanitise_for_path(parent_report.file_name)}.xlsx"
+
         self.output_path = config.DEFAULT_OUTPUT_PATH if parent_report.output_path is None else parent_report.output_path
         self.workbook_path = self.output_path.joinpath(self.file_name)
 
@@ -203,12 +228,11 @@ class ReportWorkbook:
         return df
 
     def get_question_fields(self):
-        #if not overridden by child class, just get all question columns
+        # if not overridden by child class, just get all question columns
         return self.parent_report.questions.all_question_columns
 
-
     def calculate_workbook_data(self, df):
-        #not always needed
+        # not always needed
         return df
 
     def drop_unnessecary_columns(self, df):
@@ -217,7 +241,7 @@ class ReportWorkbook:
     def fill_empty_breakdown_values(self, df):
         for field in self.breakdown_fields_flat:
             if field is not None:
-                df[field] = series_fill_na(df[field], 'BLANK')
+                df[field] = series_fill_na(df[field], config.BLANK_STR)
         return df
 
     def get_columns_to_drop(self, df):
@@ -227,7 +251,7 @@ class ReportWorkbook:
     def flatten_breakdown_fields(self):
         """retuerns a flat list of all unique breakdown fields needed, unique by virtue of set conversion"""
         flattened_breakdown_fields = list(set(pd.core.common.flatten(self.parent_report.sheet_breakdown_fields)))
-        #Remove any 'None' values before returning:
+        # Remove any 'None' values before returning:
         return [x for x in flattened_breakdown_fields if x]
 
     # def create_workbook_data(self, scored, ses):
@@ -274,15 +298,20 @@ class ReportWorkbook:
             if sheet_breakdown[0] is None:
                 worksheet_name = 'Total'
             elif len(sheet_breakdown) == 1:
+
+                #If the column only contains blanks, skip this sheet
+                unique_values = self.workbook_data[sheet_breakdown[0]].unique().tolist()
+                if len(unique_values) == 1 and unique_values[0]==f'ZZZZZ{config.BLANK_STR}':
+                    continue
+
                 worksheet_name = sheet_breakdown[0]
             else:
                 number_of_multi_levels += 1
                 worksheet_name = f"Multi-level {number_of_multi_levels}"
 
-
             worksheet = self.workbook.add_worksheet(sp.sanitize_worksheet_name(worksheet_name))
 
-            #if sheet_breakdown[0] is not None:
+            # if sheet_breakdown[0] is not None:
             columns_to_drop = list(set(self.breakdown_fields_flat).difference(sheet_breakdown))
             worksheet_data = self.workbook_data.drop(columns=columns_to_drop)
 
@@ -303,8 +332,6 @@ class ReportWorksheet:
         self.sheet_breakdown = sheet_breakdown
 
         self.formats = parent_workbook.formats
-
-
 
         self.survey_name = parent_workbook.parent_report.survey_name
         self.questions = parent_workbook.parent_report.questions
@@ -368,5 +395,3 @@ class ReportWorksheet:
 
         codes = df.columns.codes[0]
         write_level(codes, level=0, first_column=start_column)
-
-

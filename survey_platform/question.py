@@ -2,13 +2,15 @@ import config
 
 
 class Question:
+    """Class represents a single question in a survey."""
 
     def __init__(self, qid, text=None, pos_text=None, q_type='S', scored=False, category=None, online_qid=None,
-                 paper_qid=None, response_options=None, score_map=None):
+                 paper_qid=None, response_options=None, score_map=None, breakdown_text=None):
 
         self.qid = qid
-        self.text = text if text else f'Question text for {self.qid}'
-        self.pos_text = pos_text if pos_text else f'Question pos text for {self.qid}'
+        self.text = text if text else f'Question text for {qid}'
+        self.breakdown_text = breakdown_text if breakdown_text else text
+        self.pos_text = pos_text if pos_text else f'Question pos text for {qid}'
         self.q_type = q_type
         self.scored = scored
         self.category = category
@@ -35,13 +37,15 @@ class Question:
 
         text = _check_exists(config.HEAD_QTEXTFULL)
         q_type = _check_exists(config.HEAD_QTYPE)
+        breakdown_text = _check_exists(config.HEAD_BREAKDOWNTEXT)
         pos_text = _check_exists(config.HEAD_POSTEXT)
         category = _check_exists(config.HEAD_CATEGORY)
         online_qid = _check_exists(config.HEAD_ONLINEQID)
         paper_qid = _check_exists(config.HEAD_PAPERQID)
         scored = _check_exists(config.HEAD_SCORED) == 1
 
-        return cls(qid, text, pos_text, q_type, scored, category, online_qid, paper_qid, response_options, score_map)
+        return cls(qid, text, pos_text, q_type, scored, category, online_qid, paper_qid, response_options, score_map,
+                   breakdown_text)
 
     @property
     def targeted_options(self):

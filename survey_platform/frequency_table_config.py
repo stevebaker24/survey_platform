@@ -18,7 +18,7 @@ FORMATS = {'QUESTION': {**BASE_FORMAT, **{'bold': True}},
            'NEU_SQUARE': {**BASE_FORMAT, **{'bg_color': '#ffaa00', 'border': 1}},
            'NEG_SQUARE': {**BASE_FORMAT, **{'bg_color': '#fc1420', 'border': 1}},
            'IGNORE_SQUARE': {**BASE_FORMAT, **{'bg_color': '#9c9b8e', 'border': 1}},
-           'LEVEL_TITLE': {**BASE_FORMAT, **{'bold': True, 'align': 'right', 'indent': 1}},
+           'LEVEL_TITLE': {**BASE_FORMAT, **{'bold': True, 'align': 'right', 'indent': 1, 'text_wrap': True}},
            'RAG_POS': {**BASE_FORMAT,
                        **{'font_color': '#ffffff', 'bg_color': '#00a03c', 'border': 1, 'num_format': '0%'}},
            'RAG_NEU': {**BASE_FORMAT,
@@ -52,3 +52,6 @@ LOGO_PATH = r'C:\Users\steve.baker\Desktop\MAT Nonsense\picker.png'
 
 # Spacing
 ROWS_AFTER_QUESTION = 4
+
+# Header row height
+HEADER_ROW_HEIGHT = 45

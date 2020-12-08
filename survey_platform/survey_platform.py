@@ -9,7 +9,7 @@ def sanitise_for_path(string):
 def sanitize_worksheet_name(worksheet_name):
     for char in [':', '\\', '/', '?', '*', '[', ']']:
         worksheet_name = worksheet_name.replace(char, '')
-        return worksheet_name[:31]
+    return worksheet_name[:31]
 
 def _input_filetype(path, index_col):
     extension = path.split('.')[-1]
