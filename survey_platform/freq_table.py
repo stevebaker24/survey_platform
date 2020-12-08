@@ -29,15 +29,15 @@ def add_missing_options(df, question):
             df.sort_index(inplace=True)
 
 
-def create_empty_df(df, question):
+def create_empty_df(df, question, overall_text):
     # Adds response options not picked up bu the cross tab (i.e. no responses for that option
     data = [0 for x in question.response_options]
 
-    return pd.DataFrame({'Total': [0 for x in question.response_options]})
+    return pd.DataFrame({overall_text: [0 for x in question.response_options]})
 
 
-def create_crosstab(df, question, suppression_threshold, breakdown_column_names=None):
-    breakdown_columns = ['Total'] if breakdown_column_names is None else breakdown_column_names
+def create_crosstab(df, question, suppression_threshold, overall_text, breakdown_column_names=None):
+    breakdown_columns = [overall_text] if breakdown_column_names is None else breakdown_column_names
 
     if question.q_type == config.SINGLE_CODE:
         # remove anythign not in the list of respinse options
@@ -60,7 +60,7 @@ def create_crosstab(df, question, suppression_threshold, breakdown_column_names=
     # Check if any answers, if none, crfeate empy dataframe
     if len(count) == 0:
         if breakdown_column_names is None:
-            count = create_empty_df(count, question)
+            count = create_empty_df(count, question, overall_text=overall_text)
         else:
             return None
 
@@ -78,7 +78,7 @@ def create_crosstab(df, question, suppression_threshold, breakdown_column_names=
     suppressed_concatted = combine_count_percent_dfs(suppressed_count, suppressed_percent)
 
     # Remove ZZZ from blank, there to keep Blank at the back when ordering.
-    suppressed_concatted = suppressed_concatted.rename({'ZZZZZBLANK': 'BLANK'}, axis='columns')
+    suppressed_concatted = suppressed_concatted.rename({f'ZZZZZ{config.BLANK_STR}': config.BLANK_STR}, axis='columns')
 
     # calculate the 'total' rows for the bottom:
     if question.q_type == config.SINGLE_CODE:
@@ -98,7 +98,7 @@ def create_crosstab(df, question, suppression_threshold, breakdown_column_names=
         # combine into one total row and convert df to series
         total = combine_count_percent_dfs(suppressed_subtotal, suppressed_subtotal_percent).squeeze()
 
-    return dict(table=suppressed_concatted.fillna('*'), total=total.fillna('*'))
+    return dict(table=suppressed_concatted.fillna('*'), overall=total.fillna('*'))
 
 
 def suppress(df, subtotal, suppression_threshold):
@@ -134,13 +134,15 @@ def combine_count_percent_dfs(df_count, df_percent):
 
 
 class FrequencyTableReport(report.Report):
-    def __init__(self, source, output_path, questions, sheet_breakdown_fields, suppression_threshold, survey_name, report_name, file_name):
+    def __init__(self, source, output_path, questions, sheet_breakdown_fields, suppression_threshold, survey_name,
+                 report_name, file_name, overall_text=None):
         self.workbook_class = FrequencyTableWorkbook
         self.worksheet_class = FrequencyTableWorksheet
         self.report_name = 'Frequency Table Report'
 
         super().__init__(source, output_path, questions, sheet_breakdown_fields, suppression_threshold,
-                         survey_name=survey_name, report_name=report_name, file_name=file_name)
+                         survey_name=survey_name, report_name=report_name, file_name=file_name,
+                         overall_text=overall_text)
 
 
 class FrequencyTableWorkbook(report.ReportWorkbook):
@@ -205,10 +207,12 @@ class FrequencyTableWorksheet(report.ReportWorksheet):
 
         # create crosstabs dicts (for total and breakdown), returns dict of crosstabs
         crosstabtotaldict = create_crosstab(self.sheet_data, question,
-                                            self.parent_workbook.parent_report.suppression_threshold)
+                                            self.parent_workbook.parent_report.suppression_threshold,
+                                            self.parent_workbook.parent_report.overall_text)
 
         crosstabdict = create_crosstab(self.sheet_data, question,
                                        self.parent_workbook.parent_report.suppression_threshold,
+                                       self.parent_workbook.parent_report.overall_text,
                                        self.breakdown_columns)
 
         # Determine if there breakdowns or are any responses and set flag, used to determine if to write the breakdown tables/headers or not.
@@ -238,7 +242,7 @@ class FrequencyTableWorksheet(report.ReportWorksheet):
         # Write Total Header column
         # not using normal method to allow for vertical merge of total
         self.worksheet.merge_range(row, starter_column, row + self.number_of_breakdowns - 1, starter_column + 1,
-                                   'Total',
+                                   self.parent_workbook.parent_report.overall_text,
                                    self.formats['HEADER'])
         self.worksheet.write(row + self.number_of_breakdowns, starter_column, 'Count', self.formats['HEADER'])
         self.worksheet.write(row + self.number_of_breakdowns, starter_column + 1, 'Percent', self.formats['HEADER'])
@@ -248,9 +252,9 @@ class FrequencyTableWorksheet(report.ReportWorksheet):
             report.write_headers(crosstabdict['table'], self.worksheet, row, starter_column + 2,
                                  self.formats['HEADER'])
 
-            #set header row height for all levels
+            # set header row height for all levels
             for i in list(range(self.number_of_breakdowns)):
-                self.worksheet.set_row(i+row, frequency_table_config.HEADER_ROW_HEIGHT)
+                self.worksheet.set_row(i + row, frequency_table_config.HEADER_ROW_HEIGHT)
 
         row += self.number_of_breakdowns
 
@@ -277,12 +281,12 @@ class FrequencyTableWorksheet(report.ReportWorksheet):
 
         self.worksheet.write(row, 2, 'Total Responses', self.formats['OPTION_TOTAL'])
 
-        write_row_from_df(crosstabtotaldict['total'], self.worksheet, row, starter_column,
+        write_row_from_df(crosstabtotaldict['overall'], self.worksheet, row, starter_column,
                           self.formats['VALUE_TOTAL'],
                           self.formats['PERCENT_TOTAL'])
 
         if responses_bool:
-            write_row_from_df(crosstabdict['total'], self.worksheet, row, starter_column + 2,
+            write_row_from_df(crosstabdict['overall'], self.worksheet, row, starter_column + 2,
                               self.formats['VALUE_TOTAL'],
                               self.formats['PERCENT_TOTAL'])
 
@@ -296,7 +300,7 @@ class FrequencyTableWorksheet(report.ReportWorksheet):
         for question in self.questions:
             self.write_question(question)
 
-        self.worksheet.write(self.row, 2, 'Targetted Questions', self.formats['QUESTION'])
+        self.worksheet.write(self.row, 2, 'Targeted Questions', self.formats['QUESTION'])
         self.worksheet.write(self.row + 1, 2,
                              'To produce more meaningful results for questions that may not be applicable to all respondents, responses are shown below exluding response code such as “I did not need”.',
                              self.formats['QUESTION'])

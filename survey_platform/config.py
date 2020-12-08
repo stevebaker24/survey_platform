@@ -15,6 +15,9 @@ DEFAULT_SUPPRESSION_LIMIT = 30
 # Default na string
 BLANK_STR = 'BLANK'
 
+#Default total text
+OVERALL_STR = 'Overall'
+
 # Column Headers
 HEAD_QVAR = 'QID'
 HEAD_PQVAR = 'P_QID'

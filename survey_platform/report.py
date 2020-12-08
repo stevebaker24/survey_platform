@@ -122,13 +122,13 @@ class Report:
                  comparator_text=None,
                  report_name=None,
                  file_name=None,
-                 overall_text='Overall'):
+                 overall_text=None):
 
         self.source = source
         self.external_comparator = external_comparator
         self.comparator_text = comparator_text
         self.questions = questions
-        self.overall_text = overall_text
+        self.overall_text = config.OVERALL_STR if overall_text is None else overall_text
 
         self.suppression_threshold = suppression_threshold
         self.suppression_framework = suppression_framework
@@ -296,7 +296,7 @@ class ReportWorkbook:
             sheet_breakdown = sheet_breakdown if is_iterable(sheet_breakdown) else [sheet_breakdown]
 
             if sheet_breakdown[0] is None:
-                worksheet_name = 'Total'
+                worksheet_name = self.parent_report.overall_text
             elif len(sheet_breakdown) == 1:
 
                 #If the column only contains blanks, skip this sheet
