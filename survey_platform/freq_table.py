@@ -302,7 +302,7 @@ class FrequencyTableWorksheet(report.ReportWorksheet):
 
         self.worksheet.write(self.row, 2, 'Targeted Questions', self.formats['TARGETED_HEADER'])
         self.worksheet.write(self.row + 1, 2,
-                             'To produce more meaningful results for questions that may not be applicable to all respondents, results are shown below exluding response codes such as "N/A" or "I did not need".',
+                             'To produce more meaningful results for questions that may not be applicable to all respondents, results are shown below excluding response codes such as "N/A" or "I did not need".',
                              self.formats['QUESTION'])
         self.worksheet.write(self.row + 2, 2,
                              'If this is also a scored question, these are the values used to calculate Positive Scores.',
