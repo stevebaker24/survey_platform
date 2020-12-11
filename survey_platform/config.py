@@ -13,7 +13,7 @@ DEFAULT_FILL_VALUE = 'None'
 DEFAULT_SUPPRESSION_LIMIT = 30
 
 # Default na string
-BLANK_STR = 'BLANK'
+BLANK_STR = 'BLANK / MISSING'
 
 #Default total text
 OVERALL_STR = 'Overall'

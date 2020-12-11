@@ -13,6 +13,7 @@ FORMATS = {'QUESTION': {**BASE_FORMAT, **{'bold': True}},
                                         'font_color': '#4d4639'}},
            'OPTION_TOTAL': {**BASE_FORMAT, **{'bold': True, 'border': 1,
                                               'text_wrap': True}},
+           'TARGETED_HEADER': {**BASE_FORMAT, **{'bold': True, 'font_size': 20}},
            'SUBTITLE': {**BASE_FORMAT, **{'bold': True}},
            'POS_SQUARE': {**BASE_FORMAT, **{'bg_color': '#00a03c', 'border': 1}},
            'NEU_SQUARE': {**BASE_FORMAT, **{'bg_color': '#ffaa00', 'border': 1}},
@@ -32,7 +33,8 @@ FORMATS = {'QUESTION': {**BASE_FORMAT, **{'bold': True}},
                                             'text_wrap': True, 'indent': 1}},
            'RAG_Q_NUM': {**BASE_FORMAT, **{'align': 'center', 'text_wrap': True, 'border': 1,
                                            }},
-           'SET_PERCENT': {**BASE_FORMAT, **{'align': 'center', 'border': 2, 'bold': True, 'font_color': '#5b4173', 'border_color': '#5b4173'
+           'SET_PERCENT': {**BASE_FORMAT, **{'align': 'center', 'border': 2, 'bold': True, 'font_color': '#5b4173',
+                                             'border_color': '#5b4173'
                                              }},
            'RAG_GUIDANNCE': {**BASE_FORMAT, **{'text_wrap': True}},
            'RAG_GUIDANNCE_BOLD': {**BASE_FORMAT, **{'text_wrap': True, 'bold': True}},
@@ -44,8 +46,13 @@ FORMATS = {'QUESTION': {**BASE_FORMAT, **{'bold': True}},
            'SES_NEG': {**BASE_FORMAT,
                        **{'font_color': '#ffffff', 'bg_color': '#fc1420', 'border': 1, 'num_format': '0.0'}},
            'RAG_CMP': {**BASE_FORMAT,
+                       **{'font_color': '#000000', 'bg_color': '#cbbba0', 'border': 1, 'num_format': '0%',
+                          'align': 'center'}},
+           'RAG_SET_POINT_TEXT': {**BASE_FORMAT, **{'bold': True, 'align': 'center'}},
+           'SES_CMP': {**BASE_FORMAT,
                        **{'font_color': '#000000', 'bg_color': '#cbbba0', 'border': 1, 'num_format': '0.0',
-                          'align': 'center'}}}
+                          'align': 'center'}}
+           }
 
 # Picker logo
 LOGO_PATH = r'C:\Users\steve.baker\Desktop\MAT Nonsense\picker.png'

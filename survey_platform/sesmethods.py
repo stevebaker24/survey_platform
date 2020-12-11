@@ -1,5 +1,5 @@
 import pandas as pd
-from survey_platform.report import get_agg_df
+from report import get_agg_df
 
 sesmap = {5: 10, 4: 7.5, 3: 5, 2: 2.5, 1: 0}
 ses_questions_dict = {'SESCAT1': ['B5', 'B13', 'B15'], 'SESCAT2': ['C18', 'C21', 'D1'], 'SESCAT3': ['D4', 'D8', 'E3']}

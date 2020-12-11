@@ -1,5 +1,5 @@
 from . import report
-from . import frequency_table_config
+from . import report_config
 
 import pandas as pd
 import numpy as np
@@ -29,7 +29,7 @@ class SesReport(report.Report):
 class SesWorkbook(report.ReportWorkbook):
 
     def __init__(self, parent_report):
-        self.format_dict = frequency_table_config.FORMATS
+        self.format_dict = report_config.FORMATS
         self.sesmap = {5: 10, 4: 7.5, 3: 5, 2: 2.5, 1: 0}
         self.ses_questions_dict = {'SESCAT1': ['B5', 'B13', 'B15'], 'SESCAT2': ['C18', 'C21', 'D1'],
                                    'SESCAT3': ['D4', 'D8', 'E3']}
@@ -75,7 +75,7 @@ class SesWorkbook(report.ReportWorkbook):
         guidance_sheet.set_row(9, 49)
         guidance_sheet.set_row(10, 36)
 
-        guidance_sheet.insert_image('B2', frequency_table_config.LOGO_PATH, {'y_offset': 10, 'x_offset': 0})
+        guidance_sheet.insert_image('B2', report_config.LOGO_PATH, {'y_offset': 10, 'x_offset': 0})
 
         guidance_sheet.hide_gridlines(2)
 
@@ -93,7 +93,7 @@ class SesWorksheet(report.ReportWorksheet):
 
         self.worksheet.set_zoom(75)
 
-        self.worksheet.insert_image('A1', frequency_table_config.LOGO_PATH,
+        self.worksheet.insert_image('A1', report_config.LOGO_PATH,
                                     {'y_offset': 15, 'x_offset': 10, 'x_scale': 0.85, 'y_scale': 0.85})
 
         self.worksheet.freeze_panes(self.number_of_breakdowns + 7, 4)

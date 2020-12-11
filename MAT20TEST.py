@@ -1,8 +1,8 @@
-from survey_platform import survey_platform as sp
-from survey_platform import rag
-from survey_platform import freq_table as ft
-from survey_platform import sesreport
-from survey_platform import report
+import survey_platform as sp
+import rag
+import freq_table as ft
+import sesreport
+import report
 
 questions = sp.Questions.from_file(
     r"C:\Users\steve.baker\Desktop\MAT Nonsense\NMEC20 POS SCORE MAPPING V1.1 RAG format SB.xlsx")

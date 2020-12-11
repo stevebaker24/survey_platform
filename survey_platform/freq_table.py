@@ -1,5 +1,5 @@
 import report
-import config, frequency_table_config
+import config, report_config
 import copy
 
 import pandas as pd
@@ -148,7 +148,7 @@ class FrequencyTableReport(report.Report):
 class FrequencyTableWorkbook(report.ReportWorkbook):
 
     def __init__(self, parent_report):
-        self.format_dict = frequency_table_config.FORMATS
+        self.format_dict = report_config.FORMATS
         super().__init__(parent_report)
 
         # Inheritance probably not needed.
@@ -172,7 +172,7 @@ class FrequencyTableWorksheet(report.ReportWorksheet):
         self.worksheet.set_column('B:B', 1)
         self.worksheet.set_column('C:C', 50)
         self.worksheet.set_column('D:XFD', 12.29)
-        self.worksheet.insert_image('C1', frequency_table_config.LOGO_PATH, {'y_offset': 10, 'x_offset': 10})
+        self.worksheet.insert_image('C1', report_config.LOGO_PATH, {'y_offset': 10, 'x_offset': 10})
         self.worksheet.freeze_panes(5, 0)
 
         self.worksheet.set_zoom(75)
@@ -254,7 +254,7 @@ class FrequencyTableWorksheet(report.ReportWorksheet):
 
             # set header row height for all levels
             for i in list(range(self.number_of_breakdowns)):
-                self.worksheet.set_row(i + row, frequency_table_config.HEADER_ROW_HEIGHT)
+                self.worksheet.set_row(i + row, report_config.HEADER_ROW_HEIGHT)
 
         row += self.number_of_breakdowns
 
@@ -290,7 +290,7 @@ class FrequencyTableWorksheet(report.ReportWorksheet):
                               self.formats['VALUE_TOTAL'],
                               self.formats['PERCENT_TOTAL'])
 
-        row += frequency_table_config.ROWS_AFTER_QUESTION
+        row += report_config.ROWS_AFTER_QUESTION
 
         self.row = row
 
@@ -300,11 +300,11 @@ class FrequencyTableWorksheet(report.ReportWorksheet):
         for question in self.questions:
             self.write_question(question)
 
-        self.worksheet.write(self.row, 2, 'Targeted Questions', self.formats['QUESTION'])
+        self.worksheet.write(self.row, 2, 'Targeted Questions', self.formats['TARGETED_HEADER'])
         self.worksheet.write(self.row + 1, 2,
-                             'To produce more meaningful results for questions that may not be applicable to all respondents, responses are shown below exluding response code such as “I did not need”.',
+                             'To produce more meaningful results for questions that may not be applicable to all respondents, results are shown below exluding response codes such as "N/A" or "I did not need".',
                              self.formats['QUESTION'])
-        self.worksheet.write(self.row + 1, 2,
+        self.worksheet.write(self.row + 2, 2,
                              'If this is also a scored question, these are the values used to calculate Positive Scores.',
                              self.formats['QUESTION'])
 

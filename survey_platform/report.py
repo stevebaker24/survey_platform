@@ -290,7 +290,9 @@ class ReportWorkbook:
         return workbook
 
     def create_sheets(self):
+        #int to keeo count of number of multi breakdown sheets for sheet name.
         number_of_multi_levels = 0
+
         for i, sheet_breakdown in enumerate(self.parent_report.sheet_breakdown_fields):
             # add worksheet to workbook object
             sheet_breakdown = sheet_breakdown if is_iterable(sheet_breakdown) else [sheet_breakdown]
@@ -299,9 +301,10 @@ class ReportWorkbook:
                 worksheet_name = self.parent_report.overall_text
             elif len(sheet_breakdown) == 1:
 
-                #If the column only contains blanks, skip this sheet
+                # If the column only contains blanks, skip this sheet
                 unique_values = self.workbook_data[sheet_breakdown[0]].unique().tolist()
-                if len(unique_values) == 1 and unique_values[0]==f'ZZZZZ{config.BLANK_STR}':
+                if len(unique_values) == 1 and (
+                        unique_values[0] in [f'ZZZZZ{config.BLANK_STR}', f'{config.BLANK_STR}']):
                     continue
 
                 worksheet_name = sheet_breakdown[0]

@@ -165,12 +165,11 @@ class HistoricQuestion(Question):
         if score_map:
             self._scored_responses_list = super()._create_scored_responses_list()
             self._score_responses_dict = super()._create_score_responses_dict()
-            self._question_columns = super()._create_question_columns()
-            self._scored_columns_list = super()._create_scored_columns_list()
-            self._score_columns_dict = super()._create_score_columns_dict()
         else:
             self._scored_responses_list = self.parent_question.scored_responses
             self._score_responses_dict = self.parent_question.score_responses
-            self._question_columns = self.parent_question.question_columns
-            self._scored_columns_list = self.parent_question.scored_columns
-            self._score_columns_dict = self.parent_question.score_columns
+
+        self._question_columns = super()._create_question_columns()
+        self._scored_columns_list = super()._create_scored_columns_list()
+        self._score_columns_dict = super()._create_score_columns_dict()
+

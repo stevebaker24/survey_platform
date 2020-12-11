@@ -61,6 +61,10 @@ class Questions:
 
         return cls(period_questions, **kwargs_dict)
 
+    def get_period_questions(self, period):
+        """returns list of historic question objects for questions of the stated period"""
+        return [q.historic_questions[period] for q in self.questions_with_historic]
+
     @property
     def question_list(self):
         return self._question_list
@@ -181,6 +185,8 @@ class Questions:
 
     def _create_historic_questions(self, question):
         """For all historic survey periods, add HistoricQuestion object to the exisiting current period question.
+
+        only done for scored questions
 
         If config.HEAD_PDIFF column is one, denotes that the responses or scoring is diofferent form the current period,
         so recaulte info. Otherwise, scoring information is inherited from current period question.

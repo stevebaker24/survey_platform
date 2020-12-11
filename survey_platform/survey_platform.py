@@ -1,15 +1,22 @@
 import pandas as pd
 import math
+import questions as qst
+import question as sqst
+
+import numpy as np
 
 import config
 
+
 def sanitise_for_path(string):
     return string.replace("/", "")
+
 
 def sanitize_worksheet_name(worksheet_name):
     for char in [':', '\\', '/', '?', '*', '[', ']']:
         worksheet_name = worksheet_name.replace(char, '')
     return worksheet_name[:31]
+
 
 def _input_filetype(path, index_col):
     extension = path.split('.')[-1]
@@ -24,12 +31,13 @@ def _input_filetype(path, index_col):
 
 
 def calc_scores(df, questions, score_types=None):
+    """Calculate scores (pos/neu/neg) can accept questions object or list of question objects"""
     df = df.copy()
 
     if score_types is None:
         score_types = ['pos']
 
-    for question in questions.scored_questions:
+    for question in questions:
 
         question_score_response_dict = question.score_responses
         scored_responses = question.scored_responses
@@ -37,12 +45,21 @@ def calc_scores(df, questions, score_types=None):
 
         qid = question.qid
 
+
+        if isinstance(question, sqst.HistoricQuestion):
+            output_qid = question.parent_question.qid
+        else:
+            output_qid = qid
+
+
         for score in score_types:
-            score_column_header = f'{qid}{config.scoring_terms_dict[score]["suffix"]}'
+            #debug
+            print(qid, score)
+
+            score_column_header = f'{output_qid}{config.scoring_terms_dict[score]["suffix"]}'
 
             # drop if alreay in the output column set.
             if score_column_header in df.columns:
-                print(score_column_header)
                 df = df.drop(score_column_header, axis=1)
 
             if question.q_type == 'M':
@@ -55,10 +72,13 @@ def calc_scores(df, questions, score_types=None):
                 score_responses = question_score_response_dict[score]
                 scored_column = scored_columns[0]
 
-                df.loc[df[scored_column].isin(scored_responses), score_column_header] = 0
-                df.loc[df[scored_column].isin(score_responses), score_column_header] = 100
+                scoremap = {x: (0 if x not in score_responses else 100) for x in scored_responses }
+                df[score_column_header] = df[scored_column].map(scoremap)
+
+        df.drop(question.question_columns, axis=1, inplace=True)
 
     return df
+
 
 # Temporary
 class Sample:
