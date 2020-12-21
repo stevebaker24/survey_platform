@@ -119,15 +119,20 @@ class Report:
                  survey_name=config.DEFAULT_SURVEY_NAME,
                  suppression_framework=None,
                  external_comparator=None,
-                 comparator_text=None,
+                 external_comparator_n=None,
+                 comparator_text='',
                  report_name=None,
                  file_name=None,
                  overall_text=None):
 
         self.source = source
+
         self.external_comparator = external_comparator
-        self.comparator_text = comparator_text
+        self.external_comparator_n = external_comparator_n
+
+        self.comparator_text = '' if comparator_text is None else comparator_text
         self.questions = questions
+
         self.overall_text = config.OVERALL_STR if overall_text is None else overall_text
 
         self.suppression_threshold = suppression_threshold
@@ -179,13 +184,6 @@ class ReportWorkbook:
 
         self.question_fields = self.get_question_fields()
 
-        if self.parent_report.external_comparator is not None:
-            self.external_comparator_data = self.create_external_comparator_data()
-            self.external_comparator_n = self.external_comparator_n()
-            self.comparator_text = self.parent_report.comparator_text
-        else:
-            self.external_comparator_data = None
-
         self.workbook_data = self.create_workbook_data()
 
         # The type of worksheet class being used, defined in child class
@@ -209,16 +207,6 @@ class ReportWorkbook:
         self.worksheets = []
         self.create_sheets()
         self.workbook.close()
-
-    def external_comparator_n(self):
-        return len(self.parent_report.external_comparator)
-
-    def create_external_comparator_data(self):
-        df = self.parent_report.external_comparator
-        df = df[self.question_fields]
-        df = self.calculate_workbook_data(df)
-        df = self.calculate_external_comparator(df)
-        return df
 
     def create_workbook_data(self):
         df = self.parent_report.source
@@ -254,32 +242,6 @@ class ReportWorkbook:
         # Remove any 'None' values before returning:
         return [x for x in flattened_breakdown_fields if x]
 
-    # def create_workbook_data(self, scored, ses):
-    #     if scored:
-    #         data = sp.calc_scores(self.parent_report.source, self.parent_report.questions, ['pos'])
-    #
-    #         self.score_columns = [f"{x.qid}_pos" for x in self.parent_report.questions.scored_questions]
-    #         self.total_count = data[self.score_columns].count()
-    #         self.total_mean = data[self.score_columns] \
-    #             .mean() \
-    #             .mask(self.total_count < self.parent_report.suppression_threshold) \
-    #             .div(100) \
-    #             .fillna('*')
-    #         return data
-    #     if ses:
-    #         report_breakdown_fields = list(set(pd.core.common.flatten(self.parent_report.breakdown_fields)))
-    #         columns_to_keep = report_breakdown_fields + ses_questions
-    #         columns_to_drop = list(set(self.parent_report.source.columns).difference(columns_to_keep))
-    #         self.parent_report.source = self.parent_report.source.drop(columns=columns_to_drop)
-    #
-    #         for field in report_breakdown_fields:
-    #             self.parent_report.source[field] = series_fill_na(self.parent_report.source[field], 'BLANK')
-    #
-    #         for sesq in ses_questions:
-    #             self.parent_report.source[sesq] = self.parent_report.source[sesq].map(sesmap)
-    #         return self.parent_report.source
-    #     else:
-    #         return self.parent_report.source
 
     def create_report_formats(self):
         return {key: self.workbook.add_format(value) for (key, value) in self.format_dict.items()}
@@ -329,7 +291,8 @@ class ReportWorksheet:
     def __init__(self, sheet_data, worksheet, sheet_breakdown, parent_workbook):
         self.parent_workbook = parent_workbook
 
-        self.external_comparator = True if self.parent_workbook.external_comparator_data is not None else False
+        self.external_comparator = self.parent_workbook.parent_report.external_comparator
+        self.external_comparator_n = self.parent_workbook.parent_report.external_comparator_n
 
         self.sheet_data = sheet_data
         self.sheet_breakdown = sheet_breakdown
@@ -349,6 +312,12 @@ class ReportWorksheet:
             return f"{[', '.join([str(elem) for elem in self.sheet_breakdown])][0]}"
         else:
             return str(self.sheet_breakdown[0])
+
+    def write_single_header(self, title, column):
+        if self.number_of_breakdowns > 1:
+            self.worksheet.merge_range(6, column, self.number_of_breakdowns + 5, column, title, self.formats['HEADER'])
+        else:
+            self.worksheet.write(self.number_of_breakdowns + 5, column, title, self.formats['HEADER'])
 
     @staticmethod
     def write_row_from_df(df_row, worksheet, row, column, format_count, format_percent):

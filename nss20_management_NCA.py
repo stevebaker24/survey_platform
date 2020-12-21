@@ -24,15 +24,23 @@ responses = sp.Responses(
 historicdata = sp.Responses(r"C:\Users\steve.baker\PycharmProjects\python-scripts\NSS20HISTORICV2.parquet",
                             indexcol='URN')
 
-# load the current and historic data (a subet or whole thing, to speed things up)
-# data = responses.df[responses.df['Organisation code'].isin(['00L', '00N', '00P', 'RXF', 'R1H', 'RF4', '78H', 'RC9'])]
+
 data = responses.df
+
+####MAP NCA TRUST CODE
+data.loc[data['Organisation code'].isin(['RM3', 'RW6']), 'Organisation code'] = 'NCA'
+data.loc[data['Organisation code'] == 'NCA', 'Organisation Name'] = 'Northern Care Alliance'
+
+historicdata.df.loc[historicdata.df['TRUSTID'].isin(['RM3', 'RW6']), 'TRUSTID'] = 'NCA'
+
 
 ###########
 # Do benchmarking group remapping for 2020
 
 data.loc[data['Trust Type'] == 'ACO', 'Trust Type'] = 'ACU'
 data.loc[data['Trust Type'] == 'MCO', 'Trust Type'] = 'MEN'
+
+
 
 # Add Trust type names:
 
@@ -59,9 +67,7 @@ for trust in data['Organisation code'].unique():
     trustdf = data[data['Organisation code'] == trust]
     trustdf['TEMP'] = trustdf['LOCALITY1'].copy()
     trustdf = trustdf[['Sample ID', 'TEMP']]
-
     trustdf['LOC1CODE'] = (trustdf['TEMP'].astype('category').cat.codes) + 1
-    # trustdf['LOC1CODE'] = trustdf['LOC1CODE'].replace(0, np.nan)
 
     # proabbly not needed but just tryiong to match outputs
     dfs.append(trustdf[['Sample ID', 'LOC1CODE']])
@@ -73,15 +79,12 @@ data = data.merge(totaldf, how='left', left_on='Sample ID', right_on='Sample ID'
 data['LOC1ID'] = data['Organisation code'].str.split('/').str[0] + 'ID' + data['LOC1CODE'].apply(lambda x: f'{x:05d}')
 
 # ###########
-#
 
-#dataP_2 = historicdata.df[(historicdata.df['YEAR'] == '2018') & (historicdata.df['TRUSTID'].isin(['R1H', 'RF4', 'RXF']))]
-
-dataP_1 = historicdata.df[historicdata.df['YEAR'] == '2019']
+# dataP_1 = historicdata.df[historicdata.df['YEAR'] == '2019']
 # dataP_2 = historicdata.df[historicdata.df['YEAR'] == '2018']
 # dataP_3 = historicdata.df[historicdata.df['YEAR'] == '2017']
 # dataP_4 = historicdata.df[historicdata.df['YEAR'] == '2016']
-
+#
 # # Positive Score Tables
 # etabs.positivescoretable(data, questions, breakdown_field='Organisation code', suppression_threshold=11,
 #                           filename='PositiveScoreTable_CURRENT', level_prefix='L0')
@@ -95,10 +98,10 @@ dataP_1 = historicdata.df[historicdata.df['YEAR'] == '2019']
 # # SiteScores Current
 # etabs.positivescoretable(data, questions, breakdown_field='LOC1ID', suppression_threshold=11,
 #                          filename='SiteScores_CURRENT', level_prefix='L1', l1_name_column='LOCALITY1')
-
-# Significance Table
-etabs.ez(data, dataP_1, questions, 'Organisation code', 'TRUSTID', level_prefix='L0',
-         suppression_threshold=11, filename='SignificanceTable_ALL', benchmark_column='Trust Type')
+#
+# # Significance Table
+# etabs.ez(data, dataP_1, questions, 'Organisation code', 'TRUSTID', level_prefix='L0',
+#          suppression_threshold=11, filename='SignificanceTable_ALL', benchmark_column='Trust Type')
 #
 # # MinMeanMax
 # #COLUMN HEADERS NEED MANUALLY PATCHING TO MATCH EXISTING FORMAT, NO TIME TO CHANGE CODE
@@ -112,9 +115,9 @@ etabs.ez(data, dataP_1, questions, 'Organisation code', 'TRUSTID', level_prefix=
 # # Response Rate
 # etabs.response(data, 'Organisation code', 'Trust Type', 'OUTCOME', level_prefix='L0', filename='RespRates_CURRENT')
 # etabs.response(dataP_1, 'TRUSTID', 'TRUSTTYPE', 'OUTCOME', level_prefix='L0', filename='RespRates_HISTORIC')
-#
-# #Survey Information
-# etabs.survey_information(data, 'Organisation code', 'OUTCOME', level_prefix='L0', survey_name='NHS Staff Survey',
-#                          current_period='2020', period_minus_1='2019', period_minus_2='2018', period_minus_3='2017',
-#                          period_minus_4='2016', name_column='Organisation Name', type_column='Trust Type',
-#                          type_name_column='Trust Type Name', outcome_map=outcome_map)
+
+#Survey Information
+etabs.survey_information(data, 'Organisation code', 'OUTCOME', level_prefix='L0', survey_name='NHS Staff Survey',
+                         current_period='2020', period_minus_1='2019', period_minus_2='2018', period_minus_3='2017',
+                         period_minus_4='2016', name_column='Organisation Name', type_column='Trust Type',
+                         type_name_column='Trust Type Name', outcome_map=outcome_map)

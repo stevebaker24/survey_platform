@@ -2,7 +2,7 @@ import pandas as pd
 from report import get_agg_df
 
 sesmap = {5: 10, 4: 7.5, 3: 5, 2: 2.5, 1: 0}
-ses_questions_dict = {'SESCAT1': ['B5', 'B13', 'B15'], 'SESCAT2': ['C18', 'C21', 'D1'], 'SESCAT3': ['D4', 'D8', 'E3']}
+ses_questions_dict = {'Advocacy': ['Q18c', 'Q18d', 'Q18a'], 'Involvement': ['Q4b', 'Q4a', 'Q4d'], 'Motivation': ['Q2a', 'Q2b', 'Q2c']}
 
 
 def get_ses_questions(questions_dict: dict) -> list:

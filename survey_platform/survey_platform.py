@@ -37,6 +37,9 @@ def calc_scores(df, questions, score_types=None):
     if score_types is None:
         score_types = ['pos']
 
+    if isinstance(questions, qst.Questions):
+        questions = questions.scored_questions
+
     for question in questions:
 
         question_score_response_dict = question.score_responses
@@ -53,9 +56,6 @@ def calc_scores(df, questions, score_types=None):
 
 
         for score in score_types:
-            #debug
-            print(qid, score)
-
             score_column_header = f'{output_qid}{config.scoring_terms_dict[score]["suffix"]}'
 
             # drop if alreay in the output column set.

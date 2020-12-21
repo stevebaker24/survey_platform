@@ -1,6 +1,6 @@
-def get_freetext(source, questions, sheet_breakdown_fields=[], file_breakdown_field=None, file_breakdown_values=[], suppression_threshold=None, suppression_framework=None):
-
-    source = source[source['Outcome']==1]
+def get_freetext(source, questions, sheet_breakdown_fields=[], file_breakdown_field=None, file_breakdown_values=[],
+                 suppression_threshold=None, suppression_framework=None):
+    source = source[source['Outcome'] == 1]
 
     if len(file_breakdown_values) == 0 and file_breakdown_field != None:
         file_breakdown_values = source[file_breakdown_field].unique().tolist()
@@ -15,18 +15,21 @@ def get_freetext(source, questions, sheet_breakdown_fields=[], file_breakdown_fi
             breakdown_file_df = source[source[file_breakdown_field] == file_breakdown_value]
 
         workbook = xlsxwriter.Workbook(
-            r'C:\Users\steve.baker\Desktop\MAT Nonsense\output\text' + '\\' + file_breakdown_value.replace("/", "") + '_NMEC_Free_Text_Report.xlsx')
+            r'C:\Users\steve.baker\Desktop\MAT Nonsense\output\text' + '\\' + file_breakdown_value.replace("/",
+                                                                                                           "") + '_NMEC_Free_Text_Report.xlsx')
 
         header_format = workbook.add_format(
-            {'align': 'center', 'valign': 'vcenter', 'bold': True, 'text_wrap': True, 'border': 1, 'border_color': 'white',
+            {'align': 'center', 'valign': 'vcenter', 'bold': True, 'text_wrap': True, 'border': 1,
+             'border_color': 'white',
              'font_name': 'Arial', 'font_color': 'white', 'bg_color': '#5b4173'})
         value_format = workbook.add_format(
-            {'align': 'center', 'valign': 'vcenter', 'border': 1, 'border_color': '#4d4639','text_wrap': True, 'font_name': 'Arial',
+            {'align': 'center', 'valign': 'vcenter', 'border': 1, 'border_color': '#4d4639', 'text_wrap': True,
+             'font_name': 'Arial',
              'font_color': '#4d4639'})
         subtitle_format = workbook.add_format(
             {'valign': 'vcenter', 'font_name': 'Arial', 'font_color': '#4d4639', 'bold': True})
 
-        if len (sheet_breakdown_fields) == 0:
+        if len(sheet_breakdown_fields) == 0:
             sheet_breakdown_fields.append(file_breakdown_field)
 
         for sheet_breakdown_field in sheet_breakdown_fields:
@@ -43,8 +46,8 @@ def get_freetext(source, questions, sheet_breakdown_fields=[], file_breakdown_fi
             worksheet.set_column('C:C', 15)
             worksheet.set_column('D:D', 145)
 
-
-            worksheet.insert_image('B1', r'C:\Users\steve.baker\Desktop\MAT Nonsense\picker2.png', {'y_offset': 29, 'x_offset': 10})
+            worksheet.insert_image('B1', r'C:\Users\steve.baker\Desktop\MAT Nonsense\picker2.png',
+                                   {'y_offset': 29, 'x_offset': 10})
 
             row = 1
             worksheet.write(row, 2, 'New mothers\' experiences of care survey 2020', subtitle_format)
@@ -64,17 +67,17 @@ def get_freetext(source, questions, sheet_breakdown_fields=[], file_breakdown_fi
             columns = [sheet_breakdown_field] + text_question_columns
 
             my_special_df = breakdown_file_df[columns]
-            my_special_df_melt = my_special_df.melt(id_vars = sheet_breakdown_field)
-            my_special_df_melt = my_special_df_melt.rename({'variable':'Question', 'value':'Response'}, axis=1)
+            my_special_df_melt = my_special_df.melt(id_vars=sheet_breakdown_field)
+            my_special_df_melt = my_special_df_melt.rename({'variable': 'Question', 'value': 'Response'}, axis=1)
             my_special_df_meltdf5 = my_special_df_melt.dropna(how='any', subset=['Response'])
-
 
             ###suppression### Deosnt work, need metric for 'responded'
             if suppression_framework == 'patient':
                 grouped = breakdown_file_df[sheet_breakdown_field].value_counts()
                 suppress_list = (grouped.index[grouped < suppression_threshold]).tolist()
 
-                my_special_df_meltdf5.loc[my_special_df_meltdf5[sheet_breakdown_field].isin(suppress_list), ['Response']] = '* COMMENT SUPPRESSED *'
+                my_special_df_meltdf5.loc[my_special_df_meltdf5[sheet_breakdown_field].isin(suppress_list), [
+                    'Response']] = '* COMMENT SUPPRESSED *'
 
             if suppression_framework == 'staff':
                 groupeddf = my_special_df_meltdf5.groupby(['Question'] + [sheet_breakdown_field]).count()
@@ -90,11 +93,8 @@ def get_freetext(source, questions, sheet_breakdown_fields=[], file_breakdown_fi
 
                 my_special_df_meltdf5.loc[rowstochange, ['Response']] = '* COMMENT SUPPRESSED*'
 
-
             q_map_dict = dict(zip(text_question_columns, text_question_formatted))
             my_special_df_meltdf5['Question'] = my_special_df_meltdf5['Question'].map(q_map_dict)
-
-
 
             headers = ['Question'] + [i for i in my_special_df_meltdf5.columns if i != 'Question']
 
@@ -117,6 +117,6 @@ def get_freetext(source, questions, sheet_breakdown_fields=[], file_breakdown_fi
                     worksheet.write(row, column, value, value_format)
 
                     column += 1
-                row+=1
+                row += 1
 
         workbook.close()

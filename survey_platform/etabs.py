@@ -62,6 +62,24 @@ def positivescoretable(source, questions, breakdown_field, suppression_threshold
     # name the index column
     output_df.index.name = 'Question'
 
+    #handle unasked vs suppressed questions. unasked defined by either the while row being blank or,
+    # if a question from P is not present in this period. this is added in this case.
+    if period != 'P':
+        p_questions = [i.qid for i in questions.scored_questions]
+        current_historic_questions = output_df.index.str.split('_').str[0].unique()
+
+        questions_not_in_current_historic = [i for i in p_questions if i not in current_historic_questions]
+
+        missing = []
+        for question in questions_not_in_current_historic:
+            for score in ['pos', 'neu', 'neg']:
+                output_df.loc[f"{question}_{score}"] = np.nan
+
+        #find completely empty rows and populate with '-'
+        output_df.loc[output_df[output_df.columns].count(axis=1) == 0, output_df.columns] = '-'
+
+
+
     # if site names needed, add the site name row at the bottom.
     # column headers need to be 'generalised'
     if level_prefix == 'L1':
@@ -70,8 +88,9 @@ def positivescoretable(source, questions, breakdown_field, suppression_threshold
         names = ids.map(id_dict)
 
         names_dict = dict(zip(ids, names))
-        series = (pd.Series(names_dict)).rename('NAME')
+        series = (pd.Series(names_dict)).rename('SiteName')
         output_df = output_df.append(series)
+        output_df.index.name = 'CASE_LBL'
 
     # apply label prefix:
     if level_prefix is not None:
@@ -79,8 +98,13 @@ def positivescoretable(source, questions, breakdown_field, suppression_threshold
 
     output_df.index = output_df.index.str.replace('_pos.N', '_NPos')
 
-    # save csv
-    output_df.to_csv(rf'C:\Users\steve.baker\Desktop\NSS\{filename}.csv')
+    output_df.fillna('*', inplace=True)
+
+    # if l0 save csv if l1 save excel dont know why but NSS20 needs this, rob cannot fix
+    if level_prefix == 'L0':
+        output_df.to_csv(rf'C:\Users\steve.baker\Desktop\NSS\{filename}.csv')
+    elif level_prefix == 'L1':
+        output_df.to_excel(rf'C:\Users\steve.baker\Desktop\NSS\{filename}.xlsx', sheet_name=filename)
 
 
 def minmeanmax(source, questions, breakdown_field, type_field, suppression_threshold=0):
@@ -110,6 +134,7 @@ def minmeanmax(source, questions, breakdown_field, type_field, suppression_thres
         df = (eval(f'mean_df.groupby(mean_df.columns, axis=1).{aggregate_function}()'))
         # df = (eval(f'mean_df.{aggregate_function}(axis=1)')).rename('Mean')
         df.index = df.index.str.replace('_pos', f'_{aggregate_function}')
+        df.fillna('*', inplace=True)
         table_dict[breakdown] = df
 
     # write all dfs to excell
@@ -183,9 +208,6 @@ def ez(source, other_source, questions, source_breakdown_field, other_source_bre
     benchmark['type'] = benchmark.index.map(name_dict)
     benchmark_count_df = benchmark.groupby('type').sum()
 
-    benchmark_mask = (benchmark_count_df < suppression_threshold)
-    benchmark_mean_df = benchmark_mean_df.mask(benchmark_mask)
-
     benchmark_prep_df = mean_df.transpose()
     columns_to_drop = benchmark_prep_df.columns
     benchmark_prep_df['type'] = benchmark.index.map(name_dict)
@@ -199,7 +221,6 @@ def ez(source, other_source, questions, source_breakdown_field, other_source_bre
         .drop(columns=('type')) \
         .transpose()
 
-
     #####
     # picker_average_masked_sum = count_df_masked.sum(axis=1)
     # picker_average_mask = picker_average_masked_sum < suppression_threshold
@@ -207,10 +228,27 @@ def ez(source, other_source, questions, source_breakdown_field, other_source_bre
     # mean_df_picker_average = mean_df.mean(axis=1)
     # mean_df_picker_average = mean_df_picker_average.mask(picker_average_mask)
 
-
     # rename question vars for output
     mean_df_other_output = mean_df_other.copy()
     mean_df_other_output.index = mean_df_other_output.index.str.replace('_pos', '_posh')
+
+    #fill missing questions with '-' like in positve_score_Y-x
+    # handle unasked vs suppressed questions. unasked defined by either the while row being blank or,
+    # if a question from P is not present in this period. this is added in this case.
+
+    p_questions = [i.qid for i in questions.scored_questions]
+    current_historic_questions = mean_df_other_output.index.str.split('_').str[0].unique()
+
+    questions_not_in_current_historic = [i for i in p_questions if i not in current_historic_questions]
+
+    for question in questions_not_in_current_historic:
+        mean_df_other_output.loc[f"{question}_posh"] = np.nan
+
+    # find completely empty rows and populate with '-'
+    mean_df_other_output.loc[mean_df_other_output[mean_df_other_output.columns].count(axis=1) == 0, mean_df_other_output.columns] = '-'
+    #fill remaining nas with '*'
+    mean_df_other_output.fillna('*', inplace=True)
+
 
     # overall posh per trust:
     overall_posh = mean_df_other.mean(axis=0)
@@ -239,6 +277,7 @@ def ez(source, other_source, questions, source_breakdown_field, other_source_bre
         .groupby(source_breakdown_field) \
         .count() \
         .transpose()
+
     count_posn_df_other = scored_df_other.replace(0, np.nan) \
         .groupby(other_source_breakdown_field) \
         .count() \
@@ -255,14 +294,12 @@ def ez(source, other_source, questions, source_breakdown_field, other_source_bre
         .count() \
         .transpose()
 
-    # dataframe of number of positive responses total
-    count_posn_df_picker = count_posn_df.sum(axis=1)
-    count_posn_df_picker_other = count_scorable_df_other.sum(axis=1)
+    #PICKER AVERAGE POS N
+    #calc as (posscore/100) * scorable N I.e. derive posn from the postive score and base count because it is from an average not calcualted from base numbers
 
-    # dataframe of number of scorable responses total
-    count_scorable_df_picker = count_scorable_df.sum(axis=1)
-    count_scorable_df_picker_other = count_scorable_df_other.sum(axis=1)
-
+    picker_average_posn = (mean_df_picker_average/100)*count_df_picker_average
+    picker_average_posn.to_csv(rf"C:\Users\steve.baker\Desktop\NSS\pickeraverageposn.csv")
+    count_df_picker_average.to_csv(rf"C:\Users\steve.baker\Desktop\NSS\pickeraveragescorablen.csv")
     # calculate Z
     def calc_z(score_n_base, scorable_n_base, score_n_comparison, scorable_n_comparison):
         p1 = (score_n_base + 1) / (scorable_n_base + 2)
@@ -281,12 +318,12 @@ def ez(source, other_source, questions, source_breakdown_field, other_source_bre
     z_scored_historic = z_scored_historic.mask(mask)
     z_scored_historic = z_scored_historic.mask(mask_other)
     z_scored_historic.index = z_scored_historic.index.str.replace('_pos', '_Zh')
-    # apply suppression mask here... I think
 
     # add picker average suppression (unlikely to be needed but better to include)
-    z_scored_picker_average = calc_z(count_posn_df, count_scorable_df, count_posn_df_picker, count_scorable_df_picker)
+    z_scored_picker_average = calc_z(count_posn_df, count_scorable_df, picker_average_posn, count_df_picker_average)
+    z_scored_picker_average.to_csv(rf"C:\Users\steve.baker\Desktop\NSS\pickeraverageZscore.csv")
     z_scored_picker_average = z_scored_picker_average.mask(mask)
-    z_scored_picker_average = z_scored_picker_average.mask((count_df_picker_average<suppression_threshold), axis=1)
+    z_scored_picker_average = z_scored_picker_average.mask((count_df_picker_average < suppression_threshold), axis=1)
     z_scored_picker_average.index = z_scored_picker_average.index.str.replace('_pos', '_Z')
 
     # determine sig or not (buckets)
@@ -393,7 +430,7 @@ def site_n(source, questions, breakdown_field, l0_field, l1_name_field):
 
     trust_code_dict = {x: source[source[breakdown_field] == x][l0_field].unique()[0] for x in count_df.index}
 
-    count_df['iD_CODE'] = count_df.index.map(trust_code_dict)
+    count_df['ID_CODE'] = count_df.index.map(trust_code_dict)
 
     site_name_dict = {x: source[source[breakdown_field] == x][l1_name_field].unique()[0] for x in count_df.index}
 
@@ -401,20 +438,20 @@ def site_n(source, questions, breakdown_field, l0_field, l1_name_field):
 
     # Add level identifiers
     count_df.index = 'L1' + count_df.index
-    count_df['iD_CODE'] = 'L0' + count_df['iD_CODE'].str.replace('/', '_')
+    count_df['ID_CODE'] = 'L0' + count_df['ID_CODE'].str.replace('/', '_')
 
     count_df.columns = count_df.columns.str.replace('_pos', '_respondents')
     count_df.index.name = 'SITE_CODE'
 
     count_df = count_df.reset_index()
-    count_df = count_df.set_index('iD_CODE')
+    count_df = count_df.set_index('ID_CODE')
 
     count_df.to_csv(rf'C:\Users\steve.baker\Desktop\NSS\Site_N.csv')
 
 
 def survey_information(source, breakdown_field, outcome_field, level_prefix, survey_name, current_period,
                        period_minus_1, period_minus_2, period_minus_3, period_minus_4, name_column, type_column,
-                       outcome_map):
+                       type_name_column, outcome_map):
     # dict to hold all dataframes for this sheet.
     dataframes = {}
 
@@ -474,7 +511,7 @@ def survey_information(source, breakdown_field, outcome_field, level_prefix, sur
     # Organisation_Type
 
     hello3 = source[[breakdown_field, outcome_field]].groupby(breakdown_field).count()
-    type_dict = {x: source[source[breakdown_field] == x][type_column].unique()[0] for x in hello3.index}
+    type_dict = {x: source[source[breakdown_field] == x][type_name_column].unique()[0] for x in hello3.index}
     hello3['Organisation Type'] = hello3.index.map(type_dict)
     hello3.index = level_prefix + hello3.index.str.replace('/', '_')
     hello3 = hello3.rename(columns={outcome_field: 'Count', breakdown_field: ''})
@@ -662,222 +699,3 @@ def improvement_maps(source, questions, breakdown_field, suppression_threshold, 
 
     writer.save()
     pass
-
-
-# spun off a speperatemethod as a quick fix to allow for comparison to trust instead of picker average, need to implement properly
-def ez_site(source, other_source, questions, source_breakdown_field, other_source_breakdown_field, level_prefix=None,
-            suppression_threshold=0, filename='ez'):
-    # drop values in other_source_comparator not in source_comparator (i.e. trusts no longer in survey):
-    source_comparator_values = source[source_breakdown_field].unique().tolist()
-    other_source_indexes_to_remove = other_source[
-        ~other_source[other_source_breakdown_field].isin(source_comparator_values)].index
-    other_source = other_source.drop(other_source_indexes_to_remove)
-
-    # score dfs
-    scored_df_trust_GIMP = get_score_df(source, questions, 'Trust code', ['pos'])
-    scored_df = get_score_df(source, questions, source_breakdown_field, ['pos'])
-    scored_df_other = get_score_df(other_source, questions, other_source_breakdown_field, ['pos'], period='P-1')
-
-    # calcuate mean dfs
-    mean_df_trust_GIMP = get_mean_df(scored_df_trust_GIMP, 'Trust code')
-    mean_df = get_mean_df(scored_df, source_breakdown_field)
-    mean_df_other = get_mean_df(scored_df_other, other_source_breakdown_field)
-
-    # suppress mean dfs
-    count_df_trust_GIMP = scored_df_trust_GIMP \
-        .groupby('Trust code') \
-        .count() \
-        .transpose()
-
-    count_df = scored_df \
-        .groupby(source_breakdown_field) \
-        .count() \
-        .transpose()
-
-    count_df_other = scored_df_other \
-        .groupby(other_source_breakdown_field) \
-        .count() \
-        .transpose()
-
-    # apply suppression mask to mean df
-    mask_trust_GIMP = (count_df_trust_GIMP < suppression_threshold)
-    mean_df_trust_GIMP = mean_df_trust_GIMP.mask(mask_trust_GIMP)
-
-    mask = (count_df < suppression_threshold)
-    mean_df = mean_df.mask(mask)
-
-    mask_other = (count_df_other < suppression_threshold)
-    mean_df_other = mean_df_other.mask(mask_other)
-
-    # apply suppression mask to count df to make picker average suppression mask
-    count_df_masked = count_df.mask(mask)
-    picker_average_masked_sum = count_df_masked.sum(axis=1)
-    picker_average_mask = picker_average_masked_sum < suppression_threshold
-
-    mean_df_picker_average = mean_df.mean(axis=1)
-    mean_df_picker_average = mean_df_picker_average.mask(picker_average_mask)
-
-    # rename question vars for output
-    mean_df_other_output = mean_df_other.copy()
-    mean_df_other_output.index = mean_df_other_output.index.str.replace('_pos', '_posh')
-
-    # overall posh per trust:
-    overall_posh = mean_df_other.mean(axis=0)
-
-    # overall posh per trust for questions in historical dataset only
-    indexes_to_drop = []
-    for item in mean_df.index:
-        if item not in mean_df_other.index:
-            indexes_to_drop.append(item)
-
-    mean_df_h_comparable = mean_df.drop(indexes_to_drop, axis=0)
-    overall_pos = mean_df_h_comparable.mean(axis=0)
-
-    # CALC DIFF H OVERALL
-    diffhoverall = overall_pos - overall_posh
-
-    # pos score absolute difference
-    # For site specifically...
-    trust_p_df = pd.DataFrame()
-    for column in mean_df.columns:
-        trust_column = column[:3]
-        trust_p_df[column] = mean_df_trust_GIMP[trust_column]
-
-    diff_p_df_picker_average = mean_df.sub(trust_p_df, axis=0)
-    diff_p_df_picker_average.index = diff_p_df_picker_average.index.str.replace('_pos', '_diffp')
-
-    # this is the deault for non_site...
-    # diff_p_df_picker_average = mean_df.sub(mean_df_picker_average, axis=0)
-    # diff_p_df_picker_average.index = diff_p_df_picker_average.index.str.replace('_pos', '_diffp')
-
-    diff_p_df_historic = mean_df.sub(mean_df_other, axis=0)
-    diff_p_df_historic.index = diff_p_df_historic.index.str.replace('_pos', '_diffh')
-
-    # dataframe of number of positive respinses by comparator
-    count_posn_df = scored_df.replace(0, np.nan) \
-        .groupby(source_breakdown_field) \
-        .count() \
-        .transpose()
-    count_posn_df_other = scored_df_other.replace(0, np.nan) \
-        .groupby(other_source_breakdown_field) \
-        .count() \
-        .transpose()
-
-    count_posn_df_other_output = count_posn_df_other.copy()
-    count_posn_df_other_output.index = count_posn_df_other_output.index.str.replace('_pos', '_posh_N')
-
-    # dataframe of number of scorable responses by comparator
-    count_scorable_df = scored_df.groupby(source_breakdown_field) \
-        .count() \
-        .transpose()
-    count_scorable_df_other = scored_df_other.groupby(other_source_breakdown_field) \
-        .count() \
-        .transpose()
-
-    # for normal sig report but replaced for site specifically...
-    # # dataframe of number of positive responses total
-    # count_posn_df_picker = count_posn_df.sum(axis=1)
-    # count_posn_df_picker_other = count_scorable_df_other.sum(axis=1)
-    #
-    # # dataframe of number of scorable responses total
-    # count_scorable_df_picker = count_scorable_df.sum(axis=1)
-    # count_scorable_df_picker_other = count_scorable_df_other.sum(axis=1)
-
-    count_posn_df_trust_GIMP = scored_df_trust_GIMP.replace(0, np.nan) \
-        .groupby('Trust code') \
-        .count() \
-        .transpose()
-
-    count_scorablen_df_trust_GIMP = scored_df_trust_GIMP.groupby('Trust code') \
-        .count() \
-        .transpose()
-
-    count_posn_df_picker = pd.DataFrame()
-    for column in mean_df.columns:
-        trust_column = column[:3]
-        count_posn_df_picker[column] = count_posn_df_trust_GIMP[trust_column]
-
-    count_scorable_df_picker = pd.DataFrame()
-    for column in mean_df.columns:
-        trust_column = column[:3]
-        count_scorable_df_picker[column] = count_scorablen_df_trust_GIMP[trust_column]
-    print('hello')
-
-    # calculate Z
-    def calc_z(score_n_base, scorable_n_base, score_n_comparison, scorable_n_comparison):
-        p1 = (score_n_base + 1) / (scorable_n_base + 2)
-        p2 = (score_n_comparison + 1) / (scorable_n_comparison + 2)
-
-        nominator = p1.sub(p2, axis=0)
-
-        denominator1 = (p1 * (1 - p1)) / (scorable_n_base + 2)
-        denominator2 = (p2 * (1 - p2)) / (scorable_n_comparison + 2)
-        denominator_total = np.sqrt(denominator1.add(denominator2, axis=0))
-
-        return nominator / denominator_total
-
-    # apply suppression mask here... I think
-    z_scored_historic = calc_z(count_posn_df, count_scorable_df, count_posn_df_other, count_scorable_df_other)
-    z_scored_historic = z_scored_historic.mask(mask)
-    z_scored_historic = z_scored_historic.mask(mask_other)
-    z_scored_historic.index = z_scored_historic.index.str.replace('_pos', '_Zh')
-    # apply suppression mask here... I think
-
-    # add picker average suppression (unlikely to be needed but better to include)
-    z_scored_picker_average = calc_z(count_posn_df, count_scorable_df, count_posn_df_picker, count_scorable_df_picker)
-    z_scored_picker_average = z_scored_picker_average.mask(mask)
-    z_scored_picker_average = z_scored_picker_average.mask(picker_average_mask, axis=1)
-    z_scored_picker_average.index = z_scored_picker_average.index.str.replace('_pos', '_Z')
-
-    # determine sig or not (buckets)
-    def determine_z_sig(z_scored_df):
-        conds = [z_scored_df.values < -1.96, z_scored_df.values > 1.96, np.isnan(z_scored_df.values)]
-        choices = [-1, 1, np.nan]
-
-        z_bucketed_df = pd.DataFrame(np.select(conds, choices, default=0),
-                                     index=z_scored_df.index,
-                                     columns=z_scored_df.columns)
-
-        return z_bucketed_df
-
-    z_bucketed_historic = determine_z_sig(z_scored_historic)
-    z_bucketed_picker_average = determine_z_sig(z_scored_picker_average)
-
-    # count of significnace outcomes
-    df_dict = {'SUMPOS': [0, -1],
-               'SUMNEG': [0, 1],
-               'SUMZERO': [1, -1]}
-
-    # count significance
-    def count_significant(bucketed_df, prefix):
-        dataframes = []
-        for x in df_dict:
-            dataframes.append(bucketed_df.replace(df_dict[x], np.nan).count().rename(f'{prefix}{x}'))
-        return dataframes
-
-    count_significant_historic = count_significant(z_bucketed_historic, 'ZH_')
-    count_significant_picker_average = count_significant(z_bucketed_picker_average, 'Z_')
-    z_count_outputs = count_significant_historic + count_significant_picker_average
-
-    # combine it all!!!
-
-    combined_df = z_bucketed_picker_average.append(diff_p_df_picker_average) \
-        .append(z_bucketed_historic) \
-        .append(diff_p_df_historic) \
-        .append(mean_df_other_output) \
-        .append(count_posn_df_other_output) \
-        .append(overall_pos.rename('Overall_pos')) \
-        .append(overall_posh.rename('Overall_posh')) \
-        .append(diffhoverall.rename('DIFFHOVERALL'))
-
-    for series in z_count_outputs:
-        combined_df = combined_df.append(series)
-
-    # apply label prefix:
-    if level_prefix is not None:
-        combined_df.columns = (level_prefix) + (combined_df.columns.str.replace("/", "_"))
-
-    combined_df.index.name = 'Question'
-
-    # save csv
-    combined_df.to_csv(rf'C:\Users\steve.baker\Desktop\MAT Nonsense\output\etabs\hello\{filename}.csv')
